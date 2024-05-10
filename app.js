@@ -13,7 +13,7 @@ navigator.mediaDevices.enumerateDevices()
         const videoDevices = devices.filter(device => device.kind === 'videoinput');
         const rearCamera = videoDevices.find(device => !device.label.toLowerCase().includes('front'));
 
-        const constraints = { audio: true };
+        const constraints = { audio: { sampleRate: 44100, channelCount: 2 } }; // Adjust for quality
         if (rearCamera) {
             constraints.video = { deviceId: { exact: rearCamera.deviceId } };
         } else {
@@ -29,11 +29,9 @@ navigator.mediaDevices.enumerateDevices()
         videoElement.srcObject = stream;
         videoElement.play();
 
-        let options = { mimeType: 'audio/webm' };
-        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-            options = { mimeType: 'audio/mp4' }; 
-        }
-        mediaRecorder = new MediaRecorder(stream, options);
+        mediaRecorder = new MediaRecorder(stream.getAudioTracks()[0], {
+            mimeType: 'audio/webm;codecs=opus' // Opus codec for smaller size
+        });
 
         mediaRecorder.ondataavailable = event => {
             if (event.data.size > 0) {
@@ -45,7 +43,7 @@ navigator.mediaDevices.enumerateDevices()
             const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
             const audioUrl = URL.createObjectURL(audioBlob);
             downloadLink.href = audioUrl;
-            downloadLink.download = 'recording.' + mediaRecorder.mimeType.split('/')[1];
+            downloadLink.download = 'recording.webm';
             downloadLink.textContent = 'Download Recording';
             downloadLink.style.display = 'block';
             audioChunks = [];
