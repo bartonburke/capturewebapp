@@ -17,7 +17,7 @@ navigator.mediaDevices.getUserMedia({ video: true, audio: true })
         };
 
         mediaRecorder.onstop = function() {
-            const audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
+            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
             const audioUrl = URL.createObjectURL(audioBlob);
             const downloadLink = document.createElement('a');
             downloadLink.href = audioUrl;
