@@ -55,3 +55,12 @@ copyLogBtn.addEventListener('click', () => {
             .catch(err => console.error('Could not copy text: ', err));
     }
 });
+
+// Existing setup and function logEvent remains the same
+
+document.getElementById('copy-log-btn').addEventListener('click', () => {
+    const logOutput = document.getElementById('log-output');
+    logOutput.select();  // Select the text
+    document.execCommand('copy');  // Copy the text
+    alert('Copied to clipboard!');
+});
