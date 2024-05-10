@@ -10,8 +10,16 @@ let log = [];
 
 // Access the camera
 navigator.mediaDevices.getUserMedia({ video: true })
-    .then(stream => cameraStream.srcObject = stream)
-    .catch(error => console.error('MediaDevices.getUserMedia error:', error));
+    .then(stream => {
+        const video = document.getElementById('camera-stream');
+        video.srcObject = stream;
+        video.play();  // This might be necessary to ensure the video starts playing.
+    })
+    .catch(error => {
+        console.error('Access denied for camera:', error);
+        alert('Camera access was denied or failed. Please check your browser settings and permissions.');
+    });
+
 
 // Function to log button tap events
 function logEvent(event) {
