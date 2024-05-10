@@ -16,11 +16,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
 });
 
-function getSupportedMimeType() {
-    const options = ['audio/webm; codecs=opus', 'audio/webm', 'audio/ogg', 'audio/mp4'];
-    return options.find(option => MediaRecorder.isTypeSupported(option)) || null;
-}
-
 async function setupMedia() {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -29,11 +24,11 @@ async function setupMedia() {
         });
         videoElement.srcObject = stream;
         videoElement.play();
-
-        // Determine a supported MIME type
+        
+        // Check for the best supported MIME type
         const mimeType = getSupportedMimeType();
         if (!mimeType) {
-            throw new Error('No supported MIME type found for recording.');
+            throw new Error('No supported MIME type found.');
         }
 
         const audioStream = new MediaStream(stream.getAudioTracks());
@@ -52,6 +47,16 @@ async function setupMedia() {
     }
 }
 
+function getSupportedMimeType() {
+    const types = [
+        'audio/webm; codecs=opus',
+        'audio/webm',
+        'audio/ogg',
+        'audio/mp4'
+    ];
+    return types.find(type => MediaRecorder.isTypeSupported(type)) || null;
+}
+
 function setupEventListeners() {
     recordBtn.addEventListener('click', toggleRecording);
     poiBtn.addEventListener('click', () => logEvent('POI'));
@@ -60,12 +65,12 @@ function setupEventListeners() {
 }
 
 function toggleRecording() {
-    if (!recording) {
+    if (!recording && mediaRecorder) {
         mediaRecorder.start();
         recordBtn.textContent = 'Stop Recording';
         logEvent('Recording started');
         recording = true;
-    } else {
+    } else if (recording && mediaRecorder) {
         mediaRecorder.stop();
         recordBtn.textContent = 'Start Recording';
         logEvent('Recording stopped');
@@ -77,7 +82,7 @@ function handleRecordingStop() {
     const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
     const audioUrl = URL.createObjectURL(audioBlob);
     downloadLink.href = audioUrl;
-    downloadLink.download = `recording.${mediaRecorder.mimeType.split('/')[1].split(';')[0]}`; // To extract 'webm' or 'mp4'
+    downloadLink.download = 'recording.' + mediaRecorder.mimeType.split('/')[1].split(';')[0];
     downloadLink.textContent = 'Download Recording';
     downloadLink.style.display = 'block';
     audioChunks = [];
