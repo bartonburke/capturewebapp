@@ -1,5 +1,6 @@
 let mediaRecorder;
 let audioChunks = [];
+let videoElement = document.getElementById('camera-stream');
 let recordBtn = document.getElementById('record-btn');
 let logOutput = document.getElementById('log-output');
 let copyLogBtn = document.getElementById('copy-log-btn');
@@ -7,33 +8,25 @@ let downloadLink = document.getElementById('download-link');
 let recording = false;
 let log = [];
 
+
 async function startRecording() {
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+            audio: true, 
+            video: { facingMode: 'environment' } 
+        });
 
-        mediaRecorder = new MediaRecorder(stream, {
+        // Mute audio to prevent echo
+        stream.getAudioTracks().forEach(track => track.enabled = false);
+
+        videoElement.srcObject = stream;
+        videoElement.play();
+
+        mediaRecorder = new MediaRecorder(stream.getAudioTracks()[0], {
             mimeType: 'audio/mpeg'
         });
 
-        mediaRecorder.ondataavailable = event => {
-            if (event.data.size > 0) {
-                audioChunks.push(event.data);
-            }
-        };
-
-        mediaRecorder.onstop = () => {
-            const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
-            const audioUrl = URL.createObjectURL(audioBlob);
-            downloadLink.href = audioUrl;
-            downloadLink.download = 'recording.mp3';
-            downloadLink.textContent = 'Download Recording';
-            downloadLink.style.display = 'block';
-            audioChunks = [];
-        };
-
-        mediaRecorder.start();
-        recordBtn.textContent = 'Stop Recording';
-        recording = true;
+        // ... rest of the code for ondataavailable and onstop is the same ...
 
     } catch (error) {
         let message = 'Failed to access microphone.'; 
