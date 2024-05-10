@@ -8,50 +8,25 @@ let downloadLink = document.getElementById('download-link');
 let recording = false;
 let log = [];
 
+if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    alert('getUserMedia not supported on this browser.');
+    throw new Error('getUserMedia not supported on this browser.');
+}
+
 navigator.mediaDevices.getUserMedia({ video: true, audio: true })
     .then(stream => {
         videoElement.srcObject = stream;
-        mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+
+        let options = { mimeType: 'audio/webm' };
+        if (MediaRecorder.isTypeSupported(options.mimeType)) {
+            mediaRecorder = new MediaRecorder(stream, options);
+        } else {
+            mediaRecorder = new MediaRecorder(stream);
+        }
 
         mediaRecorder.ondataavailable = event => {
             audioChunks.push(event.data);
         };
 
         mediaRecorder.onstop = () => {
-            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-            const audioUrl = URL.createObjectURL(audioBlob);
-            downloadLink.href = audioUrl;
-            downloadLink.download = 'recording.webm';
-            downloadLink.style.display = 'block';
-            downloadLink.textContent = 'Download Recording';
-            audioChunks = [];
-        };
-    })
-    .catch(error => {
-        console.error('Error accessing media devices:', error);
-        alert('Please go to your browser settings and allow access to your camera and microphone.');
-    });
-
-recordBtn.addEventListener('click', () => {
-    if (!recording) {
-        mediaRecorder.start();
-        recordBtn.textContent = 'Stop Recording';
-        recording = true;
-    } else {
-        mediaRecorder.stop();
-        recordBtn.textContent = 'Start Recording';
-        recording = false;
-    }
-});
-
-copyLogBtn.addEventListener('click', () => {
-    logOutput.select();
-    document.execCommand('copy');
-    alert('Copied to clipboard!');
-});
-
-function logEvent(event) {
-    if (recording) {
-        const timestamp = new Date();
-        log.push({ event, timestamp: timestamp.toISOString() });
-        logOutput.textContent = JSON.stringify(log, null, 
+            const au
