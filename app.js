@@ -20,27 +20,15 @@ async function setupMedia() {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({
             video: { facingMode: 'environment' },
-            audio: true
+            audio: true  // Assuming you still need to capture audio for recording
         });
         videoElement.srcObject = stream;
         videoElement.play();
-        
-        // Check for the best supported MIME type
-        const mimeType = getSupportedMimeType();
-        if (!mimeType) {
-            throw new Error('No supported MIME type found.');
-        }
 
-        const audioStream = new MediaStream(stream.getAudioTracks());
-        mediaRecorder = new MediaRecorder(audioStream, { mimeType });
+        // Mute each audio track to prevent playback through speakers
+        stream.getAudioTracks().forEach(track => track.enabled = false);
 
-        mediaRecorder.ondataavailable = event => {
-            if (event.data.size > 0) {
-                audioChunks.push(event.data);
-            }
-        };
-
-        mediaRecorder.onstop = handleRecordingStop;
+        setupRecorder(stream.getAudioTracks());
     } catch (error) {
         console.error('Error accessing media devices:', error);
         alert('Error: ' + error.message);
