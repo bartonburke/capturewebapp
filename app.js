@@ -14,7 +14,7 @@ if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
 }
 
 navigator.mediaDevices.getUserMedia({
-    video: { facingMode: { exact: "environment" } }, // Request rear camera
+    video: { facingMode: "environment" }, // Request rear camera more flexibly
     audio: true
 })
 .then(stream => {
