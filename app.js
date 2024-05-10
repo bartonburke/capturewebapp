@@ -16,6 +16,11 @@ document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
 });
 
+function getSupportedMimeType() {
+    const options = ['audio/webm; codecs=opus', 'audio/webm', 'audio/ogg', 'audio/mp4'];
+    return options.find(option => MediaRecorder.isTypeSupported(option)) || null;
+}
+
 async function setupMedia() {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -25,10 +30,15 @@ async function setupMedia() {
         videoElement.srcObject = stream;
         videoElement.play();
 
-        // Prepare the recorder with the audio stream
+        // Determine a supported MIME type
+        const mimeType = getSupportedMimeType();
+        if (!mimeType) {
+            throw new Error('No supported MIME type found for recording.');
+        }
+
         const audioStream = new MediaStream(stream.getAudioTracks());
-        mediaRecorder = new MediaRecorder(audioStream, { mimeType: 'audio/webm' });
-        
+        mediaRecorder = new MediaRecorder(audioStream, { mimeType });
+
         mediaRecorder.ondataavailable = event => {
             if (event.data.size > 0) {
                 audioChunks.push(event.data);
