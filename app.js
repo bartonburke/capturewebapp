@@ -29,4 +29,45 @@ navigator.mediaDevices.getUserMedia({ video: true, audio: true })
         };
 
         mediaRecorder.onstop = () => {
-            const au
+            const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
+            const audioUrl = URL.createObjectURL(audioBlob);
+            downloadLink.href = audioUrl;
+            downloadLink.download = 'recording' + mediaRecorder.mimeType.split('/')[1];
+            downloadLink.textContent = 'Download Recording';
+            downloadLink.style.display = 'block';
+            audioChunks = [];
+        };
+    })
+    .catch(error => {
+        console.error('Error accessing media devices:', error);
+        alert('Failed to access camera or microphone. Please check your device settings.');
+    });
+
+recordBtn.addEventListener('click', () => {
+    if (!recording) {
+        mediaRecorder.start();
+        recordBtn.textContent = 'Stop Recording';
+        recording = true;
+    } else {
+        mediaRecorder.stop();
+        recordBtn.textContent = 'Start Recording';
+        recording = false;
+    }
+});
+
+copyLogBtn.addEventListener('click', () => {
+    logOutput.select();
+    document.execCommand('copy');
+    alert('Copied to clipboard!');
+});
+
+function logEvent(event) {
+    if (recording) {
+        const timestamp = new Date();
+        log.push({ event, timestamp: timestamp.toISOString() });
+        logOutput.textContent = JSON.stringify(log, null, 2);
+    }
+}
+
+document.getElementById('poi-btn').addEventListener('click', () => logEvent('POI'));
+document.getElementById('photo-note-btn').addEventListener('click', () => logEvent('Note'));
