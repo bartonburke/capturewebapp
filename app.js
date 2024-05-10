@@ -8,23 +8,17 @@ let downloadLink = document.getElementById('download-link');
 let recording = false;
 let log = [];
 
-async function startRecording() {
+async function setupMedia() {
     try {
-        // 1. Request camera permission first
-        const videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        const videoStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment' },
+            audio: true
+        });
         videoElement.srcObject = videoStream;
         videoElement.play();
 
-        // 2. Then request microphone permission
-        const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
-        // Mute audio to prevent echo
-        audioStream.getAudioTracks().forEach(track => track.enabled = false);
-
-        // 3. Combine audio and video streams
-        const combinedStream = new MediaStream([...videoStream.getVideoTracks(), ...audioStream.getAudioTracks()]);
-
-        mediaRecorder = new MediaRecorder(combinedStream.getAudioTracks()[0], { mimeType: 'audio/mpeg' });
+        const audioStream = new MediaStream(videoStream.getAudioTracks());
+        mediaRecorder = new MediaRecorder(audioStream, { mimeType: 'audio/webm' });
 
         mediaRecorder.ondataavailable = event => {
             if (event.data.size > 0) {
@@ -33,34 +27,23 @@ async function startRecording() {
         };
 
         mediaRecorder.onstop = () => {
-            const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
+            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
             const audioUrl = URL.createObjectURL(audioBlob);
             downloadLink.href = audioUrl;
-            downloadLink.download = 'recording.mp3';
+            downloadLink.download = 'recording.webm';
             downloadLink.textContent = 'Download Recording';
             downloadLink.style.display = 'block';
             audioChunks = [];
         };
 
-        mediaRecorder.start();
-        recordBtn.textContent = 'Stop Recording';
-        recording = true;
-
+        recordBtn.addEventListener('click', toggleRecording);
     } catch (error) {
-        let message = 'Failed to access media devices.';
-        if (error.name === 'NotAllowedError') {
-            message = 'Please grant permission to access camera and microphone.';
-        } else if (error.name === 'NotFoundError') {
-            message = 'No camera or microphone found.';
-        }
         console.error('Error accessing media devices:', error);
-        alert(message);
+        alert('Please check your device settings and permissions.');
     }
 }
 
-// ... rest o
-    
-  
+function toggleRecording() {
     if (!recording) {
         mediaRecorder.start();
         recordBtn.textContent = 'Stop Recording';
@@ -70,18 +53,14 @@ async function startRecording() {
         recordBtn.textContent = 'Start Recording';
         recording = false;
     }
-});
+}
+
 copyLogBtn.addEventListener('click', () => {
     logOutput.select();
     document.execCommand('copy');
     alert('Copied to clipboard!');
 });
+
 function logEvent(event) {
     if (recording) {
-        const timestamp = new Date();
-        log.push({ event, timestamp: timestamp.toISOString() });
-        logOutput.textContent = JSON.stringify(log, null, 2);
-    }
-}
-document.getElementById('poi-btn').addEventListener('click', () => logEvent('POI'));
-document.getElementById('photo-note-btn').addEventListener('click', () => logEvent('Note'));
+        const timestamp =
