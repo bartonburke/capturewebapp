@@ -8,12 +8,11 @@
 </head>
 <body>
     <div class="camera-container">
-        <video id="camera-stream" autoplay playsinline></video>
+        <video id="camera-stream" autoplay playsinline muted></video> 
         <div class="button-container">
-<button class="button-poi">POI</button>
-<button class="button-photo">Photo</button>
-<button class="button-record"></button>
-
+            <button class="button-poi" id="poi-btn">POI</button>
+            <button class="button-photo" id="photo-note-btn">Photo</button>
+            <button class="button-record" id="record-btn">Record</button> 
         </div>
     </div>
     <textarea id="log-output" readonly></textarea>
@@ -22,3 +21,4 @@
     <script src="app.js"></script>
 </body>
 </html>
+
