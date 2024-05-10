@@ -26,11 +26,12 @@ video {
     justify-content: space-around;
 }
 
-.red-button {
+button {
     background-color: red;
     color: white;
     border: none;
     padding: 10px 20px;
+    cursor: pointer;
 }
 
 textarea {
@@ -52,8 +53,4 @@ textarea {
     border: none;
     text-align: center;
     display: block; /* Ensure this is visible or hidden as needed */
-}
-
-button {
-    cursor: pointer;
 }
