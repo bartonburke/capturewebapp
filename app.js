@@ -10,14 +10,14 @@ let log = [];
 
 async function setupMedia() {
     try {
-        const videoStream = await navigator.mediaDevices.getUserMedia({
+        const stream = await navigator.mediaDevices.getUserMedia({
             video: { facingMode: 'environment' },
             audio: true
         });
-        videoElement.srcObject = videoStream;
+        videoElement.srcObject = stream;
         videoElement.play();
 
-        const audioStream = new MediaStream(videoStream.getAudioTracks());
+        const audioStream = new MediaStream(stream.getAudioTracks());
         mediaRecorder = new MediaRecorder(audioStream, { mimeType: 'audio/webm' });
 
         mediaRecorder.ondataavailable = event => {
@@ -61,6 +61,4 @@ copyLogBtn.addEventListener('click', () => {
     alert('Copied to clipboard!');
 });
 
-function logEvent(event) {
-    if (recording) {
-        const timestamp =
+document.addEventListener('DOMContentLoaded', setupMedia);
