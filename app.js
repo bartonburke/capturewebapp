@@ -30,7 +30,7 @@ navigator.mediaDevices.getUserMedia({ video: true, audio: true })
 
         mediaRecorder.onstop = () => {
             const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
-            const audioUrl = URL.createObjectURL(audioBlob);
+            const audioUrl = URL.createObjectURL(audioBlob)
             downloadLink.href = audioUrl;
             downloadLink.download = 'recording' + mediaRecorder.mimeType.split('/')[1];
             downloadLink.textContent = 'Download Recording';
