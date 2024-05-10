@@ -64,3 +64,58 @@ document.getElementById('copy-log-btn').addEventListener('click', () => {
     document.execCommand('copy');  // Copy the text
     alert('Copied to clipboard!');
 });
+
+let mediaRecorder;
+let audioChunks = [];
+
+navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+    .then(stream => {
+        const video = document.getElementById('camera-stream');
+        video.srcObject = stream;
+        video.play();
+
+        // Prepare for recording
+        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder.ondataavailable = event => {
+            audioChunks.push(event.data);
+        };
+        mediaRecorder.onstop = () => {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
+            const audioUrl = URL.createObjectURL(audioBlob);
+            const downloadLink = document.createElement('a');
+            downloadLink.href = audioUrl;
+            downloadLink.download = 'recording.mp3';
+            downloadLink.textContent = 'Download MP3';
+            document.body.appendChild(downloadLink);
+            audioChunks = [];  // Clear the chunks for next recording
+        };
+    })
+    .catch(error => {
+        console.error('Error accessing media devices:', error);
+        alert('Failed to access camera or microphone. Please check your device settings.');
+    });
+
+function startRecording() {
+    if (mediaRecorder && mediaRecorder.state === 'inactive') {
+        mediaRecorder.start();
+        console.log('Recording started');
+    }
+}
+
+function stopRecording() {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+        console.log('Recording stopped');
+    }
+}
+
+document.getElementById('record-btn').addEventListener('click', () => {
+    if (mediaRecorder.state === 'inactive') {
+        startRecording();
+        document.getElementById('record-btn').textContent = 'Stop Recording';
+    } else {
+        stopRecording();
+        document.getElementById('record-btn').textContent = 'Start Recording';
+    }
+});
+
