@@ -8,37 +8,57 @@ let downloadLink = document.getElementById('download-link');
 let recording = false;
 let log = [];
 
-
 async function startRecording() {
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-            audio: true, 
-            video: { facingMode: 'environment' } 
-        });
-
-        // Mute audio to prevent echo
-        stream.getAudioTracks().forEach(track => track.enabled = false);
-
-        videoElement.srcObject = stream;
+        // 1. Request camera permission first
+        const videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        videoElement.srcObject = videoStream;
         videoElement.play();
 
-        mediaRecorder = new MediaRecorder(stream.getAudioTracks()[0], {
-            mimeType: 'audio/mpeg'
-        });
+        // 2. Then request microphone permission
+        const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-        // ... rest of the code for ondataavailable and onstop is the same ...
+        // Mute audio to prevent echo
+        audioStream.getAudioTracks().forEach(track => track.enabled = false);
+
+        // 3. Combine audio and video streams
+        const combinedStream = new MediaStream([...videoStream.getVideoTracks(), ...audioStream.getAudioTracks()]);
+
+        mediaRecorder = new MediaRecorder(combinedStream.getAudioTracks()[0], { mimeType: 'audio/mpeg' });
+
+        mediaRecorder.ondataavailable = event => {
+            if (event.data.size > 0) {
+                audioChunks.push(event.data);
+            }
+        };
+
+        mediaRecorder.onstop = () => {
+            const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
+            const audioUrl = URL.createObjectURL(audioBlob);
+            downloadLink.href = audioUrl;
+            downloadLink.download = 'recording.mp3';
+            downloadLink.textContent = 'Download Recording';
+            downloadLink.style.display = 'block';
+            audioChunks = [];
+        };
+
+        mediaRecorder.start();
+        recordBtn.textContent = 'Stop Recording';
+        recording = true;
 
     } catch (error) {
-        let message = 'Failed to access microphone.'; 
+        let message = 'Failed to access media devices.';
         if (error.name === 'NotAllowedError') {
-            message = 'Please grant permission to access microphone.';
+            message = 'Please grant permission to access camera and microphone.';
         } else if (error.name === 'NotFoundError') {
-            message = 'No microphone found.';
+            message = 'No camera or microphone found.';
         }
         console.error('Error accessing media devices:', error);
         alert(message);
     }
 }
+
+// ... rest o
     
   
     if (!recording) {
