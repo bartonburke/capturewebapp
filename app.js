@@ -8,50 +8,59 @@ let downloadLink = document.getElementById('download-link');
 let recording = false;
 let log = [];
 
-if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    alert('getUserMedia not supported on this browser.');
-    throw new Error('getUserMedia not supported on this browser.');
-}
+navigator.mediaDevices.enumerateDevices()
+    .then(devices => {
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+        const rearCamera = videoDevices.find(device => !device.label.toLowerCase().includes('front'));
 
-navigator.mediaDevices.getUserMedia({
-    video: { facingMode: "environment" }, // Request rear camera more flexibly
-    audio: true
-})
-.then(stream => {
-    videoElement.srcObject = stream;
-    videoElement.play();
-
-    // Check if MediaRecorder is supported
-    let options = { mimeType: 'audio/webm' };
-    if (MediaRecorder.isTypeSupported(options.mimeType)) {
-        mediaRecorder = new MediaRecorder(stream, options);
-    } else {
-        options = { mimeType: 'video/mp4' }; // fallback MIME type
-        if (MediaRecorder.isTypeSupported(options.mimeType)) {
-            mediaRecorder = new MediaRecorder(stream, options);
+        const constraints = { audio: true };
+        if (rearCamera) {
+            constraints.video = { deviceId: { exact: rearCamera.deviceId } };
         } else {
-            mediaRecorder = new MediaRecorder(stream); // default without MIME type
+            constraints.video = true;
         }
-    }
 
-    mediaRecorder.ondataavailable = event => {
-        audioChunks.push(event.data);
-    };
+        return navigator.mediaDevices.getUserMedia(constraints);
+    })
+    .then(stream => {
+        // Mute audio to prevent echo
+        stream.getAudioTracks().forEach(track => track.enabled = false);
 
-    mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
-        const audioUrl = URL.createObjectURL(audioBlob);
-        downloadLink.href = audioUrl;
-        downloadLink.download = 'recording' + mediaRecorder.mimeType.split('/')[1];
-        downloadLink.textContent = 'Download Recording';
-        downloadLink.style.display = 'block';
-        audioChunks = [];
-    };
-})
-.catch(error => {
-    console.error('Error accessing media devices:', error);
-    alert('Failed to access camera or microphone. Please check your device settings.');
-});
+        videoElement.srcObject = stream;
+        videoElement.play();
+
+        let options = { mimeType: 'audio/webm' };
+        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+            options = { mimeType: 'audio/mp4' }; 
+        }
+        mediaRecorder = new MediaRecorder(stream, options);
+
+        mediaRecorder.ondataavailable = event => {
+            if (event.data.size > 0) {
+                audioChunks.push(event.data);
+            }
+        };
+
+        mediaRecorder.onstop = () => {
+            const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
+            const audioUrl = URL.createObjectURL(audioBlob);
+            downloadLink.href = audioUrl;
+            downloadLink.download = 'recording.' + mediaRecorder.mimeType.split('/')[1];
+            downloadLink.textContent = 'Download Recording';
+            downloadLink.style.display = 'block';
+            audioChunks = [];
+        };
+    })
+    .catch(error => {
+        let message = 'Failed to access media devices.';
+        if (error.name === 'NotAllowedError') {
+            message = 'Please grant permission to access camera and microphone.';
+        } else if (error.name === 'NotFoundError') {
+            message = 'No camera or microphone found.';
+        }
+        console.error('Error accessing media devices:', error);
+        alert(message);
+    });
 
 
 recordBtn.addEventListener('click', () => {
