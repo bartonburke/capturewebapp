@@ -10,22 +10,22 @@ document.addEventListener('DOMContentLoaded', () => {
     let audioChunks = [];
     let log = [];
     let recording = false;
+    let recordingStartTime;
 
-async function setupMedia() {
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: 'environment' }  // Request only video to simplify
-        });
-        const videoElement = document.getElementById('camera-stream');
-        videoElement.srcObject = stream;
-        videoElement.play();
-        console.log('Camera access granted');
-    } catch (error) {
-        console.error('Error accessing media devices:', error);
-        alert('Camera access error: ' + error.message);
+    async function setupMedia() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment' },
+                audio: true  // Ensure audio is also requested
+            });
+            videoElement.srcObject = stream;
+            videoElement.play();
+            console.log('Camera access granted');
+        } catch (error) {
+            console.error('Error accessing media devices:', error);
+            alert('Camera access error: ' + error.message);
+        }
     }
-}
-
 
     function getSupportedMimeType() {
         const types = ['audio/webm; codecs=opus', 'audio/webm', 'audio/ogg', 'audio/mp4'];
@@ -34,6 +34,7 @@ async function setupMedia() {
 
     function toggleRecording() {
         if (!recording && mediaRecorder) {
+            recordingStartTime = new Date();  // Capture the start time
             mediaRecorder.start();
             recordBtn.textContent = 'Stop Recording';
             logEvent('Recording started');
@@ -47,10 +48,14 @@ async function setupMedia() {
     }
 
     function handleRecordingStop() {
+        const mimeType = mediaRecorder.mimeType.split('/')[1].split(';')[0];
+        const formattedTime = recordingStartTime.toISOString().replace(/:/g, '-').split('.')[0];
+        const filename = `recording_${formattedTime}.${mimeType}`;
+        
         const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
         const audioUrl = URL.createObjectURL(audioBlob);
         downloadLink.href = audioUrl;
-        downloadLink.download = `recording.${mediaRecorder.mimeType.split('/')[1].split(';')[0]}`;
+        downloadLink.download = filename;
         downloadLink.textContent = 'Download Recording';
         downloadLink.style.display = 'block';
         audioChunks = [];
