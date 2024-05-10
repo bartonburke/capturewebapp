@@ -1,6 +1,5 @@
 let mediaRecorder;
 let audioChunks = [];
-let videoElement = document.getElementById('camera-stream');
 let recordBtn = document.getElementById('record-btn');
 let logOutput = document.getElementById('log-output');
 let copyLogBtn = document.getElementById('copy-log-btn');
@@ -10,18 +9,9 @@ let log = [];
 
 async function startRecording() {
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-            audio: { sampleRate: 44100, channelCount: 2 },
-            video: { deviceId: { exact: rearCameraId } } // Get rearCameraId from enumerateDevices if available
-        });
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-        // Mute audio to prevent echo
-        stream.getAudioTracks().forEach(track => track.enabled = false);
-
-        videoElement.srcObject = stream;
-        videoElement.play();
-
-        mediaRecorder = new MediaRecorder(stream.getAudioTracks()[0], {
+        mediaRecorder = new MediaRecorder(stream, {
             mimeType: 'audio/mpeg'
         });
 
@@ -35,7 +25,7 @@ async function startRecording() {
             const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
             const audioUrl = URL.createObjectURL(audioBlob);
             downloadLink.href = audioUrl;
-            downloadLink.download = 'recording.mp3'; 
+            downloadLink.download = 'recording.mp3';
             downloadLink.textContent = 'Download Recording';
             downloadLink.style.display = 'block';
             audioChunks = [];
@@ -46,30 +36,16 @@ async function startRecording() {
         recording = true;
 
     } catch (error) {
-        let message = 'Failed to access media devices.';
+        let message = 'Failed to access microphone.'; // Specifically mention microphone
         if (error.name === 'NotAllowedError') {
-            message = 'Please grant permission to access camera and microphone.';
+            message = 'Please grant permission to access microphone.';
         } else if (error.name === 'NotFoundError') {
-            message = 'No camera or microphone found.';
+            message = 'No microphone found.';
         }
         console.error('Error accessing media devices:', error);
         alert(message);
     }
-}
-
-recordBtn.addEventListener('click', () => {
-    if (!recording) {
-        startRecording();
-    } else {
-        mediaRecorder.stop();
-        recordBtn.textContent = 'Start Recording';
-        recording = false;
-    }
-});
-
-          
-
-    
+} 
     
   
     if (!recording) {
