@@ -36,7 +36,7 @@ async function startRecording() {
         recording = true;
 
     } catch (error) {
-        let message = 'Failed to access microphone.'; // Specifically mention microphone
+        let message = 'Failed to access microphone.'; 
         if (error.name === 'NotAllowedError') {
             message = 'Please grant permission to access microphone.';
         } else if (error.name === 'NotFoundError') {
@@ -45,7 +45,7 @@ async function startRecording() {
         console.error('Error accessing media devices:', error);
         alert(message);
     }
-} 
+}
     
   
     if (!recording) {
