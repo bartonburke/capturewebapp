@@ -9,16 +9,18 @@ let recording = false;
 let log = [];
 
 // Access the camera
-navigator.mediaDevices.getUserMedia({ video: true })
-    .then(stream => {
-        const video = document.getElementById('camera-stream');
-        video.srcObject = stream;
-        video.play();  // This might be necessary to ensure the video starts playing.
-    })
-    .catch(error => {
-        console.error('Access denied for camera:', error);
-        alert('Camera access was denied or failed. Please check your browser settings and permissions.');
-    });
+navigator.mediaDevices.getUserMedia({ 
+    video: { facingMode: { exact: "environment" } } // "environment" refers to the back-facing camera
+})
+.then(stream => {
+    const video = document.getElementById('camera-stream');
+    video.srcObject = stream;
+    video.play(); // Ensure the video starts playing
+})
+.catch(error => {
+    console.error('Error accessing the camera:', error);
+    alert('Failed to access the camera. Please check your device settings.');
+});
 
 
 // Function to log button tap events
