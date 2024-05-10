@@ -13,48 +13,29 @@ document.addEventListener('DOMContentLoaded', () => {
     setupMedia();
     setupEventListeners();
 });
-
 async function setupMedia() {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({
             video: { facingMode: 'environment' },
             audio: true
+            audio: true  // Assuming you still need to capture audio for recording
         });
         videoElement.srcObject = stream;
         videoElement.play();
-
+        // Check for the best supported MIME type
         const mimeType = getSupportedMimeType();
         if (!mimeType) {
             throw new Error('No supported MIME type found.');
         }
-
-        const audioStream = new MediaStream(stream.getAudioTracks());
-        mediaRecorder = new MediaRecorder(audioStream, { mimeType });
-        stream.getAudioTracks().forEach(track => track.enabled = false);
-
-        mediaRecorder.ondataavailable = event => {
-            if (event.data.size > 0) {
-                audioChunks.push(event.data);
-            }
-        };
-
-        mediaRecorder.onstop = handleRecordingStop;
-    } catch (error) {
-        console.error('Error accessing media devices:', error);
-        alert('Error: ' + error.message);
-    }
-}
         const audioStream = new MediaStream(stream.getAudioTracks());
         mediaRecorder = new MediaRecorder(audioStream, { mimeType });
         // Mute each audio track to prevent playback through speakers
         stream.getAudioTracks().forEach(track => track.enabled = false);
-
         mediaRecorder.ondataavailable = event => {
             if (event.data.size > 0) {
                 audioChunks.push(event.data);
             }
         };
-
         mediaRecorder.onstop = handleRecordingStop;
         setupRecorder(stream.getAudioTracks());
     } catch (error) {
@@ -108,11 +89,19 @@ function updateLogDisplay() {
     logOutput.textContent = JSON.stringify(log, null, 2);
 }
 function copyLogToClipboard() {
-    const logText = logOutput.textContent;
+    logOutput.select();
+    document.execCommand('copy');
+    alert('Copied JSON to clipboard!');
+    // Get the JSON text
+    const logText = logOutput.value;
+
+    // Use the Clipboard API
     navigator.clipboard.writeText(logText)
-        .then(() => alert('Copied JSON to clipboard!'))
+        .then(() => {
+            alert('Copied JSON to clipboard!'); 
+        })
         .catch(err => {
             console.error('Failed to copy: ', err);
-            alert('Could not copy to clipboard. Please try selecting the text and copying manually.');
+            alert('Could not copy to clipboard. Please try selecting the text and copying manually.'); // Fallback for unsupported browsers
         });
 }
