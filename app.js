@@ -13,35 +13,46 @@ if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     throw new Error('getUserMedia not supported on this browser.');
 }
 
-navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-    .then(stream => {
-        videoElement.srcObject = stream;
+navigator.mediaDevices.getUserMedia({
+    video: { facingMode: { exact: "environment" } }, // Request rear camera
+    audio: true
+})
+.then(stream => {
+    videoElement.srcObject = stream;
+    videoElement.play();
 
-        let options = { mimeType: 'audio/webm' };
+    // Check if MediaRecorder is supported
+    let options = { mimeType: 'audio/webm' };
+    if (MediaRecorder.isTypeSupported(options.mimeType)) {
+        mediaRecorder = new MediaRecorder(stream, options);
+    } else {
+        options = { mimeType: 'video/mp4' }; // fallback MIME type
         if (MediaRecorder.isTypeSupported(options.mimeType)) {
             mediaRecorder = new MediaRecorder(stream, options);
         } else {
-            mediaRecorder = new MediaRecorder(stream);
+            mediaRecorder = new MediaRecorder(stream); // default without MIME type
         }
+    }
 
-        mediaRecorder.ondataavailable = event => {
-            audioChunks.push(event.data);
-        };
+    mediaRecorder.ondataavailable = event => {
+        audioChunks.push(event.data);
+    };
 
-        mediaRecorder.onstop = () => {
-            const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
-            const audioUrl = URL.createObjectURL(audioBlob)
-            downloadLink.href = audioUrl;
-            downloadLink.download = 'recording' + mediaRecorder.mimeType.split('/')[1];
-            downloadLink.textContent = 'Download Recording';
-            downloadLink.style.display = 'block';
-            audioChunks = [];
-        };
-    })
-    .catch(error => {
-        console.error('Error accessing media devices:', error);
-        alert('Failed to access camera or microphone. Please check your device settings.');
-    });
+    mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
+        const audioUrl = URL.createObjectURL(audioBlob);
+        downloadLink.href = audioUrl;
+        downloadLink.download = 'recording' + mediaRecorder.mimeType.split('/')[1];
+        downloadLink.textContent = 'Download Recording';
+        downloadLink.style.display = 'block';
+        audioChunks = [];
+    };
+})
+.catch(error => {
+    console.error('Error accessing media devices:', error);
+    alert('Failed to access camera or microphone. Please check your device settings.');
+});
+
 
 recordBtn.addEventListener('click', () => {
     if (!recording) {
