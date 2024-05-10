@@ -74,10 +74,10 @@ function toggleRecording() {
 }
 
 function handleRecordingStop() {
-    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+    const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
     const audioUrl = URL.createObjectURL(audioBlob);
     downloadLink.href = audioUrl;
-    downloadLink.download = 'recording.webm';
+    downloadLink.download = `recording.${mediaRecorder.mimeType.split('/')[1].split(';')[0]}`; // To extract 'webm' or 'mp4'
     downloadLink.textContent = 'Download Recording';
     downloadLink.style.display = 'block';
     audioChunks = [];
