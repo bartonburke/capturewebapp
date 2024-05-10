@@ -93,7 +93,16 @@ function updateLogDisplay() {
     logOutput.textContent = JSON.stringify(log, null, 2);
 }
 function copyLogToClipboard() {
-    logOutput.select();
-    document.execCommand('copy');
-    alert('Copied JSON to clipboard!');
+    // Get the JSON text
+    const logText = logOutput.value;
+
+    // Use the Clipboard API
+    navigator.clipboard.writeText(logText)
+        .then(() => {
+            alert('Copied JSON to clipboard!'); 
+        })
+        .catch(err => {
+            console.error('Failed to copy: ', err);
+            alert('Could not copy to clipboard. Please try selecting the text and copying manually.'); // Fallback for unsupported browsers
+        });
 }
