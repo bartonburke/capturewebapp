@@ -10,7 +10,7 @@ body, html {
 .camera-container {
     position: relative;
     width: 100%;
-    height: 80vh;  /* Adjust based on your needs */
+    height: 80vh; /* Adjust based on your needs */
 }
 
 video {
@@ -56,33 +56,4 @@ textarea {
 
 button {
     cursor: pointer;
-}
-/* Styling for POI and Photo buttons */
-.button-poi, .button-photo {
-  font-size: 1.2em;   /* Larger text size */
-  padding: 15px 20px; /* Larger padding for bigger button */
-  border: none;
-  background-color: #007BFF; /* Example blue background */
-  color: white;
-  border-radius: 5px; /* Slightly rounded corners */
-}
-
-/* Styling for the Record button */
-.button-record {
-  width: 60px;       /* Equal width and height for circle */
-  height: 60px;
-  border-radius: 50%; /* Fully rounded corners to make a circle */
-  background-color: red; /* Red background */
-  border: none;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  color: white;
-}
-
-/* Adding icons or text might require additional alignment, this centers content */
-.button-record::before {
-  content: '●'; /* Unicode character for a solid circle, represents 'recording' */
-  font-size: 2em;
-  color: white;
 }
