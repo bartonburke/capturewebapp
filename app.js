@@ -9,28 +9,30 @@ let log = [];
 
 navigator.mediaDevices.getUserMedia({ video: true, audio: true })
     .then(stream => {
-        videoElement.srcObject = stream;
-        mediaRecorder = new MediaRecorder(stream);
+        const video = document.getElementById('camera-stream');
+        video.srcObject = stream;
+        video.play();
 
-        mediaRecorder.ondataavailable = function(event) {
+        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder.ondataavailable = event => {
             audioChunks.push(event.data);
         };
-
-        mediaRecorder.onstop = function() {
-            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+        mediaRecorder.onstop = () => {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
             const audioUrl = URL.createObjectURL(audioBlob);
             const downloadLink = document.createElement('a');
             downloadLink.href = audioUrl;
             downloadLink.download = 'recording.mp3';
             downloadLink.textContent = 'Download MP3';
             document.body.appendChild(downloadLink);
-            audioChunks = [];  // Reset the chunks for the next recording
+            audioChunks = [];  // Clear the chunks for next recording
         };
     })
     .catch(error => {
         console.error('Error accessing media devices:', error);
         alert('Failed to access camera or microphone. Please check your device settings.');
     });
+
 
 recordBtn.addEventListener('click', () => {
     if (!recording) {
