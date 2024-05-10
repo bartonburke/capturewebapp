@@ -39,16 +39,16 @@ navigator.mediaDevices.enumerateDevices()
             }
         };
 
-        mediaRecorder.onstop = () => {
-            const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
-            const audioUrl = URL.createObjectURL(audioBlob);
-            downloadLink.href = audioUrl;
-            downloadLink.download = 'recording.webm';
-            downloadLink.textContent = 'Download Recording';
-            downloadLink.style.display = 'block';
-            audioChunks = [];
-        };
-    })
+mediaRecorder.onstop = () => {
+    const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
+    const audioUrl = URL.createObjectURL(audioBlob);
+    downloadLink.href = audioUrl;
+    downloadLink.download = 'recording.webm'; // Set the correct file extension here
+    downloadLink.textContent = 'Download Recording';
+    downloadLink.style.display = 'block';
+    audioChunks = [];
+};
+
     .catch(error => {
         let message = 'Failed to access media devices.';
         if (error.name === 'NotAllowedError') {
