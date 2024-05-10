@@ -11,33 +11,21 @@ document.addEventListener('DOMContentLoaded', () => {
     let log = [];
     let recording = false;
 
-    async function setupMedia() {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'environment' },
-                audio: true
-            });
-            videoElement.srcObject = stream;
-            videoElement.play();
-            const audioStream = new MediaStream(stream.getAudioTracks());
-            stream.getAudioTracks().forEach(track => track.enabled = false);
-
-            const mimeType = getSupportedMimeType();
-            if (!mimeType) {
-                throw new Error('No supported MIME type found.');
-            }
-            mediaRecorder = new MediaRecorder(audioStream, { mimeType });
-            mediaRecorder.ondataavailable = event => {
-                if (event.data.size > 0) {
-                    audioChunks.push(event.data);
-                }
-            };
-            mediaRecorder.onstop = handleRecordingStop;
-        } catch (error) {
-            console.error('Error accessing media devices:', error);
-            alert('Error: ' + error.message);
-        }
+async function setupMedia() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment' }  // Request only video to simplify
+        });
+        const videoElement = document.getElementById('camera-stream');
+        videoElement.srcObject = stream;
+        videoElement.play();
+        console.log('Camera access granted');
+    } catch (error) {
+        console.error('Error accessing media devices:', error);
+        alert('Camera access error: ' + error.message);
     }
+}
+
 
     function getSupportedMimeType() {
         const types = ['audio/webm; codecs=opus', 'audio/webm', 'audio/ogg', 'audio/mp4'];
