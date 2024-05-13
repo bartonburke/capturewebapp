@@ -25,7 +25,6 @@ async function initCamera() {
                 audioChunks.push(event.data);
             }
         };
-        mediaRecorder.onstop = downloadAudio;
     } catch (error) {
         console.error('Error accessing media devices.', error);
         alert('Error accessing media devices. Please ensure camera and microphone permissions are granted.');
