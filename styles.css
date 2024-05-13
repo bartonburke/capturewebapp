@@ -7,6 +7,7 @@ body, html {
     justify-content: center;
     align-items: center;
     font-family: Arial, sans-serif;
+    background: #000; /* Optional: Dark background to highlight the video */
 }
 
 .container {
@@ -25,17 +26,20 @@ video {
 
 .controls {
     position: absolute;
-    top: 10px;
+    bottom: 10px; /* Move buttons to the bottom */
     left: 50%;
     transform: translateX(-50%);
     display: flex;
     flex-direction: column;
     align-items: center;
+    background: rgba(255, 255, 255, 0.8); /* Optional: Slightly opaque background for readability */
+    padding: 10px;
+    border-radius: 8px;
 }
 
 button {
     padding: 10px 20px;
-    margin: 10px 0;
+    margin: 5px 0; /* Reduced margin for better fit */
     font-size: 16px;
     cursor: pointer;
 }
