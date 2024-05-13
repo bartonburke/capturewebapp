@@ -2,7 +2,7 @@ let mediaRecorder;
 let audioChunks = [];
 let isRecording = false;
 let log = [];
-let startTime;
+let recordingStartTime;
 
 async function initCamera() {
     const video = document.getElementById('video');
@@ -35,9 +35,9 @@ async function initCamera() {
 function startRecording() {
     if (mediaRecorder && mediaRecorder.state !== 'recording') {
         audioChunks = [];
+        recordingStartTime = new Date();
         mediaRecorder.start();
         isRecording = true;
-        startTime = new Date();
         document.getElementById('record').textContent = 'Stop Recording';
     }
 }
@@ -54,7 +54,7 @@ function downloadAudio() {
     const audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
     const audioUrl = URL.createObjectURL(audioBlob);
     const a = document.createElement('a');
-    const timestamp = startTime.toISOString().replace(/[:.]/g, '-');
+    const timestamp = recordingStartTime.toISOString().replace(/[:.]/g, '-');
     a.href = audioUrl;
     a.download = `audio_${timestamp}.mp3`;
     document.body.appendChild(a);
