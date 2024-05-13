@@ -7,6 +7,7 @@ body, html {
     justify-content: center;
     align-items: center;
     font-family: Arial, sans-serif;
+    background-color: #000;
 }
 
 .container {
@@ -21,6 +22,7 @@ video {
     width: 100%;
     height: auto;
     display: block;
+    background-color: #000;
 }
 
 .controls {
@@ -39,4 +41,3 @@ button {
     font-size: 16px;
     cursor: pointer;
 }
- 
