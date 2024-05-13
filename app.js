@@ -18,21 +18,25 @@ async function initCamera() {
         };
     } catch (error) {
         console.error('Error accessing media devices.', error);
-        alert('Error accessing camera or microphone. Please check permissions.');
+        alert('Error accessing media devices. Please ensure camera and microphone permissions are granted.');
     }
 }
 
 function startRecording() {
-    audioChunks = [];
-    mediaRecorder.start();
-    isRecording = true;
-    document.getElementById('record').textContent = 'Stop Recording';
+    if (mediaRecorder && mediaRecorder.state !== 'recording') {
+        audioChunks = [];
+        mediaRecorder.start();
+        isRecording = true;
+        document.getElementById('record').textContent = 'Stop Recording';
+    }
 }
 
 function stopRecording() {
-    mediaRecorder.stop();
-    isRecording = false;
-    document.getElementById('record').textContent = 'Start Recording';
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+        isRecording = false;
+        document.getElementById('record').textContent = 'Start Recording';
+    }
 }
 
 function downloadAudio() {
