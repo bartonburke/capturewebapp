@@ -26,20 +26,22 @@ video {
 
 .controls {
     position: absolute;
-    bottom: 20px; /* Move buttons lower */
+    bottom: 20px; /* Move buttons to the very bottom */
     left: 50%;
     transform: translateX(-50%);
     display: flex;
-    flex-direction: column;
-    align-items: center;
+    flex-direction: row; /* Changed to row to align buttons horizontally */
+    flex-wrap: wrap;
+    justify-content: center;
     background: rgba(255, 255, 255, 0.8); /* Optional: Slightly opaque background for readability */
     padding: 10px;
     border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5); /* Optional: Add some shadow for better visibility */
 }
 
 button {
     padding: 10px 20px;
-    margin: 5px 0; /* Reduced margin for better fit */
+    margin: 5px 10px; /* Reduced margin for better fit */
     font-size: 16px;
     cursor: pointer;
 }
