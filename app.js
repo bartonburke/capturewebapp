@@ -2,12 +2,15 @@ let mediaRecorder;
 let audioChunks = [];
 let isRecording = false;
 let log = [];
- 
+
 async function initCamera() {
     const video = document.getElementById('video');
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         video.srcObject = stream;
+        video.onloadedmetadata = () => {
+            video.play();
+        };
 
         mediaRecorder = new MediaRecorder(stream);
         mediaRecorder.ondataavailable = event => {
