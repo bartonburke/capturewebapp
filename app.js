@@ -8,15 +8,14 @@ async function initCamera() {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         video.srcObject = stream;
-        video.onloadedmetadata = () => {
-            video.play();
-        };
+        video.play();
 
         mediaRecorder = new MediaRecorder(stream);
         mediaRecorder.ondataavailable = event => {
             audioChunks.push(event.data);
         };
     } catch (error) {
+        alert('Error accessing media devices. Please ensure camera and microphone permissions are granted.');
         console.error('Error accessing media devices.', error);
     }
 }
@@ -49,6 +48,9 @@ function copyJSON() {
     const json = JSON.stringify(log, null, 2);
     navigator.clipboard.writeText(json).then(() => {
         alert('JSON copied to clipboard');
+    }).catch(err => {
+        alert('Failed to copy JSON to clipboard');
+        console.error('Error copying JSON to clipboard', err);
     });
 }
 
