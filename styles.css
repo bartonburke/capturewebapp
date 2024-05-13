@@ -1,87 +1,45 @@
-let mediaRecorder;
-let audioChunks = [];
-let isRecording = false;
-let log = [];
-let startTime;
-
-async function initCamera() {
-    const video = document.getElementById('video');
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-                facingMode: 'user'  // Front-facing camera (selfie)
-            },
-            audio: true
-        });
-
-        video.srcObject = stream;
-        video.onloadedmetadata = () => {
-            video.play();
-        };
-
-        mediaRecorder = new MediaRecorder(stream);
-        mediaRecorder.ondataavailable = event => {
-            audioChunks.push(event.data);
-        };
-    } catch (error) {
-        console.error('Error accessing media devices.', error);
-        alert('Error accessing media devices. Please ensure camera and microphone permissions are granted.');
-    }
+body, html {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: Arial, sans-serif;
+    background: #000; /* Optional: Dark background to highlight the video */
 }
 
-function startRecording() {
-    if (mediaRecorder && mediaRecorder.state !== 'recording') {
-        audioChunks = [];
-        mediaRecorder.start();
-        isRecording = true;
-        startTime = new Date();
-        document.getElementById('record').textContent = 'Stop Recording';
-    }
+.container {
+    position: relative;
+    width: 100%;
+    max-width: 600px;
+    height: 100%;
+    max-height: 100vh;
 }
 
-function stopRecording() {
-    if (mediaRecorder && mediaRecorder.state === 'recording') {
-        mediaRecorder.stop();
-        isRecording = false;
-        document.getElementById('record').textContent = 'Start Recording';
-    }
+video {
+    width: 100%;
+    height: auto;
+    display: block;
 }
 
-function downloadAudio() {
-    const audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
-    const audioUrl = URL.createObjectURL(audioBlob);
-    const a = document.createElement('a');
-    const timestamp = startTime.toISOString().replace(/[:.]/g, '-');
-    a.href = audioUrl;
-    a.download = `audio_${timestamp}.mp3`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+.controls {
+    position: absolute;
+    bottom: 20px; /* Move buttons lower */
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.8); /* Optional: Slightly opaque background for readability */
+    padding: 10px;
+    border-radius: 8px;
 }
 
-function copyJSON() {
-    const json = JSON.stringify(log, null, 2);
-    navigator.clipboard.writeText(json).then(() => {
-        alert('JSON copied to clipboard');
-    });
+button {
+    padding: 10px 20px;
+    margin: 5px 0; /* Reduced margin for better fit */
+    font-size: 16px;
+    cursor: pointer;
 }
-
-function logButtonPress(type) {
-    const timestamp = new Date().toISOString();
-    log.push({ type, timestamp });
-}
-
-document.getElementById('record').addEventListener('click', () => {
-    if (isRecording) {
-        stopRecording();
-    } else {
-        startRecording();
-    }
-});
-
-document.getElementById('poi').addEventListener('click', () => logButtonPress('POI'));
-document.getElementById('note').addEventListener('click', () => logButtonPress('Note'));
-document.getElementById('download').addEventListener('click', downloadAudio);
-document.getElementById('copy').addEventListener('click', copyJSON);
-
-initCamera();
