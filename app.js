@@ -2,7 +2,7 @@ let mediaRecorder;
 let audioChunks = [];
 let isRecording = false;
 let log = [];
-
+ 
 async function initCamera() {
     const video = document.getElementById('video');
     try {
