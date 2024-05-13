@@ -9,7 +9,7 @@ async function initCamera() {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({
             video: {
-                facingMode: { exact: "environment" }  // Rear camera
+                facingMode: { ideal: "environment" }  // Rear camera
             },
             audio: true
         });
