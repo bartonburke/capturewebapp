@@ -6,7 +6,13 @@ let log = [];
 async function initCamera() {
     const video = document.getElementById('video');
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+                facingMode: 'user'  // Front-facing camera
+            },
+            audio: true
+        });
+
         video.srcObject = stream;
         video.onloadedmetadata = () => {
             video.play();
