@@ -2,13 +2,14 @@ let mediaRecorder;
 let audioChunks = [];
 let isRecording = false;
 let log = [];
+let startTime;
 
 async function initCamera() {
     const video = document.getElementById('video');
     try {
         const stream = await navigator.mediaDevices.getUserMedia({
             video: {
-                facingMode: { exact: "environment" }  // Rear camera
+                facingMode: 'user'  // Front-facing camera (selfie)
             },
             audio: true
         });
@@ -20,8 +21,11 @@ async function initCamera() {
 
         mediaRecorder = new MediaRecorder(stream);
         mediaRecorder.ondataavailable = event => {
-            audioChunks.push(event.data);
+            if (event.data.size > 0) {
+                audioChunks.push(event.data);
+            }
         };
+        mediaRecorder.onstop = downloadAudio;
     } catch (error) {
         console.error('Error accessing media devices.', error);
         alert('Error accessing media devices. Please ensure camera and microphone permissions are granted.');
@@ -33,6 +37,7 @@ function startRecording() {
         audioChunks = [];
         mediaRecorder.start();
         isRecording = true;
+        startTime = new Date();
         document.getElementById('record').textContent = 'Stop Recording';
     }
 }
@@ -49,8 +54,9 @@ function downloadAudio() {
     const audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
     const audioUrl = URL.createObjectURL(audioBlob);
     const a = document.createElement('a');
+    const timestamp = startTime.toISOString().replace(/[:.]/g, '-');
     a.href = audioUrl;
-    a.download = 'audio.mp3';
+    a.download = `audio_${timestamp}.mp3`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
