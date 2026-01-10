@@ -3,32 +3,35 @@
 ## Project Overview
 Mobile-first PWA for capturing Phase 1 Environmental Site Assessment (ESA) data on iOS Safari. Combines continuous audio recording, photo capture with GPS, and timestamp correlation for AI-assisted report generation.
 
-**Status**: Early prototype - capture UI functional, storage/processing not yet implemented
+**Status**: Prototype with Projects management + GPS-tagged photo capture + IndexedDB persistence
 
 ## Tech Stack
 - **Framework**: Next.js 16 (App Router) + React 19 + TypeScript
 - **Styling**: Tailwind CSS 4
+- **Storage**: IndexedDB (browser-based persistence)
 - **Target Platform**: iOS Safari (PWA mode)
-- **APIs Used**: MediaDevices (camera), Geolocation (GPS - not yet implemented), MediaRecorder (audio - not yet implemented)
+- **APIs Used**: MediaDevices (camera), Geolocation (GPS), IndexedDB (storage), MediaRecorder (audio - not yet implemented)
 
 ## Current Implementation Status
 
 ### ✅ Completed Features
-- [x] Capture UI shell with session state management (NOT_STARTED → RECORDING → PAUSED → ENDED)
+- [x] **Projects Management** - Home screen with projects list, create/resume projects
+- [x] **IndexedDB Persistence** - Projects and photos stored locally with full metadata
+- [x] **GPS Integration** - Real-time GPS tracking with accuracy display, coordinates saved per photo
+- [x] **Dynamic Routing** - Navigate between projects list and capture interface (`/capture/[projectId]`)
+- [x] Capture UI with session state management (NOT_STARTED → RECORDING → PAUSED → ENDED)
 - [x] Rear camera access with live preview
-- [x] Photo capture with flash feedback
-- [x] Session timer (HH:MM:SS format)
-- [x] Photo counter
+- [x] Photo capture with flash feedback + base64 storage
+- [x] Session timer (HH:MM:SS format) and photo counter
 - [x] Pause/Resume with camera stream persistence (no black screen)
+- [x] GPS status indicator (acquiring/active/error with accuracy)
+- [x] Back navigation to projects list
 - [x] iOS Safari optimizations (safe area handling, no pull-to-refresh)
 - [x] PWA manifest for home screen installation
-- [x] Touch-optimized controls positioned above Safari UI bar
 
-### 🚧 In Progress
-- [ ] GPS tagging for photos (next up)
+### 🚧 Next Up
 - [ ] Continuous audio recording during session
-- [ ] IndexedDB storage for photos + metadata
-- [ ] Session metadata (site name, timestamps)
+- [ ] Project details/review page (view captured photos)
 
 ### 📋 Planned Features
 - [ ] Post-session processing (Whisper transcription + Claude Vision analysis)
@@ -65,19 +68,62 @@ Mobile-first PWA for capturing Phase 1 Environmental Site Assessment (ESA) data 
 ## File Structure
 ```
 app/
+├── lib/
+│   ├── types.ts                 # Shared TypeScript interfaces (Project, PhotoMetadata, GPS)
+│   └── db.ts                    # IndexedDB utilities (CRUD for projects/photos)
 ├── components/
-│   └── CaptureInterface.tsx    # Main capture UI (301 lines)
+│   ├── CaptureInterface.tsx     # Photo capture UI with GPS (~420 lines)
+│   ├── ProjectsList.tsx         # Projects home screen (~110 lines)
+│   └── CreateProjectModal.tsx   # Create project form (~110 lines)
+├── capture/[projectId]/
+│   └── page.tsx                 # Dynamic route for project capture
 ├── globals.css                  # iOS-optimized mobile styles
 ├── layout.tsx                   # Root layout with PWA meta tags
-└── page.tsx                     # Entry point (renders CaptureInterface)
+└── page.tsx                     # Entry point (renders ProjectsList)
 
 public/
 ├── manifest.json                # PWA configuration
 └── icon.svg                     # App icon (camera design)
 
 PRD.md                           # Full product requirements
-TESTING.md                       # iOS testing guide (ngrok setup, checklist)
+TESTING.md                       # iOS testing guide
+CLAUDE.md                        # This file - context for AI assistants
 ```
+
+## Data Model
+
+### TypeScript Interfaces (`app/lib/types.ts`)
+```typescript
+interface Project {
+  id: string;              // UUID
+  name: string;            // e.g., "123 Main St ESA"
+  lead: string;            // Project lead name
+  notes?: string;          // Optional notes
+  createdAt: string;       // ISO8601
+  modifiedAt: string;      // ISO8601
+  photoCount: number;      // Total photos
+}
+
+interface GpsCoordinates {
+  latitude: number;
+  longitude: number;
+  accuracy: number;        // meters
+  timestamp: number;       // Unix timestamp
+}
+
+interface PhotoMetadata {
+  id: string;              // UUID
+  timestamp: string;       // ISO8601
+  projectId: string;       // Links to parent project
+  gps: GpsCoordinates | null;
+  imageData: string;       // Base64 encoded JPEG
+  sessionTimestamp: number;  // Session duration when captured
+}
+```
+
+### IndexedDB Schema (`choragraph-capture` database)
+- **projects** store - Projects with keyPath `id`, indexed by `modifiedAt`
+- **photos** store - Photos with keyPath `id`, indexed by `projectId` and `timestamp`
 
 ## Development Workflow
 
@@ -99,11 +145,12 @@ Use ngrok HTTPS URL on iPhone Safari, then add to home screen for PWA mode.
 
 ## Known Issues / Limitations
 
-1. **Camera Permission**: Requires HTTPS on iOS. Use ngrok for local dev.
+1. **Camera & GPS Permissions**: Require HTTPS on iOS. Use ngrok for local dev.
 2. **Node Version**: Requires Node 20.9.0+ (Next.js 16 requirement)
-3. **Photos Not Persisted**: Currently increment counter but don't save to IndexedDB
-4. **No GPS Yet**: Location API not integrated
-5. **No Audio Recording**: MediaRecorder not implemented
+3. **Base64 Storage**: Photos stored as base64 strings - may impact performance with many photos
+4. **No Audio Recording**: MediaRecorder not yet implemented
+5. **No Photo Review**: Can't view captured photos yet (only counter updates)
+6. **Private Browsing**: IndexedDB unavailable in Safari private mode
 
 ## Key Code Patterns
 
@@ -133,18 +180,79 @@ if (stream && videoRef.current) {
 className="absolute bottom-24 left-0 right-0"  // 96px from bottom
 ```
 
-## Testing Checklist (from TESTING.md)
+### GPS Tracking Pattern
+```typescript
+// Initialize GPS on session start
+const initializeGps = () => {
+  watchIdRef.current = navigator.geolocation.watchPosition(
+    (position) => setCurrentGps({ lat, lng, accuracy, timestamp }),
+    (error) => handleGpsError(error),
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+  );
+};
+
+// Stop GPS on session end or unmount
+const stopGps = () => {
+  if (watchIdRef.current) {
+    navigator.geolocation.clearWatch(watchIdRef.current);
+  }
+};
+```
+
+### IndexedDB Photo Storage
+```typescript
+// Convert blob to base64, save with GPS metadata
+canvas.toBlob(async (blob) => {
+  const reader = new FileReader();
+  reader.onloadend = async () => {
+    const photoMetadata: PhotoMetadata = {
+      id: crypto.randomUUID(),
+      projectId: project.id,
+      gps: currentGps ? { ...currentGps } : null,
+      imageData: reader.result as string,
+      timestamp: new Date().toISOString(),
+      sessionTimestamp: duration
+    };
+    await savePhoto(photoMetadata);
+    await updateProject({ ...project, photoCount: project.photoCount + 1 });
+  };
+  reader.readAsDataURL(blob);
+}, 'image/jpeg', 0.9);
+```
+
+## Testing Checklist
+
+### Projects Workflow
+- [ ] Projects list loads on home screen
+- [ ] Create new project modal (name, lead, notes)
+- [ ] New project navigates to capture interface
+- [ ] Select existing project resumes capture
+- [ ] Project photo count updates after capture
+- [ ] Back button returns to projects list
+- [ ] Data persists after page refresh
+
+### Capture Interface
 - [ ] Camera preview loads (rear camera)
-- [ ] Photo capture works (flash + count increment)
+- [ ] GPS indicator appears (yellow → green with accuracy)
+- [ ] Photo capture works (flash + count increment + IndexedDB save)
+- [ ] Photos save with GPS coordinates (check console log)
+- [ ] GPS denied/unavailable → photos still work (gps: null)
 - [ ] Pause stops timer, disables capture button
 - [ ] Resume keeps camera live, re-enables capture
-- [ ] End session stops camera, shows summary
+- [ ] End session stops camera & GPS, shows summary
 - [ ] All buttons tappable above Safari bar
 
+### iOS Safari Specific
+- [ ] HTTPS via ngrok for camera + GPS permissions
+- [ ] GPS permission prompt appears on session start
+- [ ] Location Services settings respected
+- [ ] PWA mode (add to home screen) works
+- [ ] No pull-to-refresh interference
+
 ## Next Session Goals
-1. **GPS Integration**: Capture location on photo capture, display in UI
-2. **Storage Layer**: IndexedDB schema + persistence for photos
-3. **Audio Recording**: MediaRecorder integration for continuous recording
+1. **Audio Recording**: MediaRecorder integration for continuous recording during session
+2. **Photo Review Interface**: View captured photos from project details page
+3. **Export Functionality**: Export project data (photos + GPS + metadata) to JSON
 
 ## Useful Context for AI Assistants
 

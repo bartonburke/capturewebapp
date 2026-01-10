@@ -1,5 +1,5 @@
-import CaptureInterface from './components/CaptureInterface';
+import ProjectsList from './components/ProjectsList';
 
 export default function Home() {
-  return <CaptureInterface />;
+  return <ProjectsList />;
 }

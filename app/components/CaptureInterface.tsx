@@ -1,19 +1,32 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Project, SessionState, GpsStatus, GpsCoordinates, PhotoMetadata } from '../lib/types';
+import { savePhoto, updateProject } from '../lib/db';
 
-type SessionState = 'NOT_STARTED' | 'RECORDING' | 'PAUSED' | 'ENDED';
+interface Props {
+  project: Project;
+}
 
-export default function CaptureInterface() {
+export default function CaptureInterface({ project }: Props) {
+  const router = useRouter();
+
   const [sessionState, setSessionState] = useState<SessionState>('NOT_STARTED');
   const [duration, setDuration] = useState(0);
-  const [photoCount, setPhotoCount] = useState(0);
+  const [photoCount, setPhotoCount] = useState(project.photoCount);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // GPS state
+  const [gpsStatus, setGpsStatus] = useState<GpsStatus>('NOT_REQUESTED');
+  const [currentGps, setCurrentGps] = useState<GpsCoordinates | null>(null);
+  const [gpsError, setGpsError] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const watchIdRef = useRef<number | null>(null);
 
   // Initialize camera once when starting recording
   useEffect(() => {
@@ -85,13 +98,77 @@ export default function CaptureInterface() {
     }
   };
 
+  const initializeGps = () => {
+    if (!navigator.geolocation) {
+      setGpsStatus('ERROR');
+      setGpsError('GPS not supported');
+      return;
+    }
+
+    setGpsStatus('REQUESTING');
+    setGpsError(null);
+
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        setCurrentGps({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+          timestamp: position.timestamp
+        });
+        setGpsStatus('ACTIVE');
+        setGpsError(null);
+      },
+      (error) => {
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            setGpsStatus('DENIED');
+            setGpsError('Location permission denied');
+            break;
+          case error.POSITION_UNAVAILABLE:
+            setGpsStatus('ERROR');
+            setGpsError('Location unavailable');
+            break;
+          case error.TIMEOUT:
+            setGpsStatus('ERROR');
+            setGpsError('Location timeout');
+            break;
+        }
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      }
+    );
+
+    watchIdRef.current = watchId;
+  };
+
+  const stopGps = () => {
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    setGpsStatus('NOT_REQUESTED');
+    setCurrentGps(null);
+    setGpsError(null);
+  };
+
+  // Cleanup GPS on unmount
+  useEffect(() => {
+    return () => {
+      stopGps();
+    };
+  }, []);
+
   const handleStartSession = () => {
     setSessionState('RECORDING');
     setDuration(0);
-    setPhotoCount(0);
+    initializeGps();
   };
 
-  const handleCapturePhoto = () => {
+  const handleCapturePhoto = async () => {
     if (!videoRef.current || !canvasRef.current) return;
 
     const video = videoRef.current;
@@ -107,18 +184,59 @@ export default function CaptureInterface() {
     // Draw current video frame to canvas
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    // Convert to blob and save (for now, just increment count)
-    // In future: save to IndexedDB with GPS and timestamp
-    canvas.toBlob((blob) => {
+    // Convert to blob and save to IndexedDB
+    canvas.toBlob(async (blob) => {
       if (blob) {
-        // TODO: Save blob to IndexedDB with metadata
-        setPhotoCount(prev => prev + 1);
+        try {
+          // Convert blob to base64
+          const reader = new FileReader();
+          reader.readAsDataURL(blob);
+          reader.onloadend = async () => {
+            const base64data = reader.result as string;
 
-        // Visual feedback
-        const flash = document.getElementById('flash-overlay');
-        if (flash) {
-          flash.classList.remove('opacity-0');
-          setTimeout(() => flash.classList.add('opacity-0'), 100);
+            // Create photo metadata
+            const photoMetadata: PhotoMetadata = {
+              id: crypto.randomUUID(),
+              timestamp: new Date().toISOString(),
+              projectId: project.id,
+              gps: currentGps ? { ...currentGps } : null,
+              imageData: base64data,
+              sessionTimestamp: duration,
+            };
+
+            // Save to IndexedDB
+            await savePhoto(photoMetadata);
+
+            // Update project photo count and modified date
+            const updatedProject = {
+              ...project,
+              photoCount: project.photoCount + 1,
+              modifiedAt: new Date().toISOString(),
+            };
+            await updateProject(updatedProject);
+
+            // Update local state
+            setPhotoCount(prev => prev + 1);
+
+            // Debug log
+            console.log('Photo captured:', {
+              id: photoMetadata.id,
+              projectName: project.name,
+              gps: currentGps
+                ? `${currentGps.latitude.toFixed(6)}, ${currentGps.longitude.toFixed(6)} (±${Math.round(currentGps.accuracy)}m)`
+                : 'No GPS'
+            });
+          };
+
+          // Visual feedback
+          const flash = document.getElementById('flash-overlay');
+          if (flash) {
+            flash.classList.remove('opacity-0');
+            setTimeout(() => flash.classList.add('opacity-0'), 100);
+          }
+        } catch (error) {
+          console.error('Failed to save photo:', error);
+          alert('Failed to save photo. Please try again.');
         }
       }
     }, 'image/jpeg', 0.9);
@@ -144,11 +262,11 @@ export default function CaptureInterface() {
 
   const handleEndSession = () => {
     setSessionState('ENDED');
+    stopGps();
     if (stream) {
       stream.getTracks().forEach(track => track.stop());
       setStream(null);
     }
-    // TODO: Trigger post-processing flow
   };
 
   const formatDuration = (seconds: number): string => {
@@ -173,6 +291,28 @@ export default function CaptureInterface() {
       case 'RECORDING': return 'Recording';
       case 'PAUSED': return 'Paused';
       case 'ENDED': return 'Ended';
+    }
+  };
+
+  const getGpsStatusColor = () => {
+    switch (gpsStatus) {
+      case 'ACTIVE': return 'text-green-400';
+      case 'REQUESTING': return 'text-yellow-400 animate-pulse';
+      case 'ERROR':
+      case 'DENIED': return 'text-red-400';
+      default: return 'text-gray-400';
+    }
+  };
+
+  const getGpsStatusText = () => {
+    if (gpsStatus === 'ACTIVE' && currentGps) {
+      return `±${Math.round(currentGps.accuracy)}m`;
+    }
+    switch (gpsStatus) {
+      case 'REQUESTING': return 'Acquiring...';
+      case 'DENIED': return 'Denied';
+      case 'ERROR': return 'Unavailable';
+      default: return '';
     }
   };
 
@@ -213,19 +353,56 @@ export default function CaptureInterface() {
 
       {/* Header */}
       <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/80 to-transparent p-4 z-10">
+        {/* Back button and project name */}
+        <div className="flex items-center gap-3 mb-2">
+          <button
+            onClick={() => router.push('/')}
+            className="text-white hover:text-gray-300 transition-colors"
+            aria-label="Back to projects"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <h1 className="text-white font-semibold text-lg truncate">{project.name}</h1>
+        </div>
+
+        {/* Session status and stats */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <h1 className="text-white font-semibold text-lg">ESA Capture Agent</h1>
             <div className="flex items-center gap-2">
               <div className={`w-2 h-2 rounded-full ${getStatusColor()} ${sessionState === 'RECORDING' ? 'animate-pulse' : ''}`} />
               <span className="text-white text-sm font-medium">{getStatusText()}</span>
             </div>
+
+            {/* GPS Status */}
+            {sessionState !== 'NOT_STARTED' && sessionState !== 'ENDED' && (
+              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-black/40">
+                <svg
+                  className={`w-3 h-3 ${getGpsStatusColor()}`}
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                </svg>
+                <span className="text-xs text-white">
+                  {getGpsStatusText()}
+                </span>
+              </div>
+            )}
           </div>
           <div className="text-right">
             <div className="text-white font-mono text-sm">{formatDuration(duration)}</div>
             <div className="text-gray-300 text-xs">{photoCount} photos</div>
           </div>
         </div>
+
+        {/* GPS Error Display */}
+        {gpsError && sessionState !== 'NOT_STARTED' && sessionState !== 'ENDED' && (
+          <div className="mt-2 bg-red-600/90 text-white text-xs px-3 py-2 rounded">
+            GPS: {gpsError}
+          </div>
+        )}
       </div>
 
       {/* Bottom Controls */}
@@ -287,12 +464,20 @@ export default function CaptureInterface() {
                 Duration: {formatDuration(duration)} | Photos: {photoCount}
               </p>
             </div>
-            <button
-              onClick={() => setSessionState('NOT_STARTED')}
-              className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors active:scale-95"
-            >
-              Start New Session
-            </button>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => router.push('/')}
+                className="py-3 px-6 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-lg transition-colors active:scale-95"
+              >
+                Back to Projects
+              </button>
+              <button
+                onClick={() => setSessionState('NOT_STARTED')}
+                className="py-3 px-6 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors active:scale-95"
+              >
+                New Session
+              </button>
+            </div>
           </div>
         )}
       </div>
