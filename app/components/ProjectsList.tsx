@@ -58,7 +58,7 @@ export default function ProjectsList() {
   }, [loadProjects]);
 
   const handleProjectClick = (projectId: string) => {
-    router.push(`/capture/${projectId}`);
+    router.push(`/project/${projectId}`);
   };
 
   const handleProjectCreated = (project: Project) => {
@@ -105,13 +105,19 @@ export default function ProjectsList() {
               className="w-full bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg p-4 text-left transition-colors"
             >
               <div className="flex justify-between items-start mb-2">
-                <div>
+                <div className="flex-1">
                   <h3 className="font-semibold text-lg">{project.name}</h3>
                   <p className="text-sm text-gray-400">Lead: {project.lead}</p>
                 </div>
-                <div className="text-right">
-                  <div className="text-2xl font-bold text-blue-400">{project.photoCount}</div>
-                  <div className="text-xs text-gray-400">photos</div>
+                <div className="flex gap-4 text-right">
+                  <div>
+                    <div className="text-2xl font-bold text-blue-400">{project.photoCount}</div>
+                    <div className="text-xs text-gray-400">photos</div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-green-400">{project.audioCount || 0}</div>
+                    <div className="text-xs text-gray-400">audio</div>
+                  </div>
                 </div>
               </div>
               {project.notes && (
