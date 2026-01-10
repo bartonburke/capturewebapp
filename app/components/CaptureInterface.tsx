@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Project, SessionState, GpsStatus, GpsCoordinates, PhotoMetadata, AudioMetadata } from '../lib/types';
-import { savePhoto, updateProject, saveAudio } from '../lib/db';
+import { savePhoto, updateProject, saveAudio, getProject } from '../lib/db';
 
 interface Props {
   project: Project;
@@ -330,13 +330,17 @@ export default function CaptureInterface({ project }: Props) {
             // Save to IndexedDB
             await savePhoto(photoMetadata);
 
-            // Update project photo count and modified date
-            const updatedProject = {
-              ...project,
-              photoCount: project.photoCount + 1,
-              modifiedAt: new Date().toISOString(),
-            };
-            await updateProject(updatedProject);
+            // Read current project from DB to get accurate photo count
+            const currentProject = await getProject(project.id);
+            if (currentProject) {
+              // Update project photo count and modified date
+              const updatedProject = {
+                ...currentProject,
+                photoCount: currentProject.photoCount + 1,
+                modifiedAt: new Date().toISOString(),
+              };
+              await updateProject(updatedProject);
+            }
 
             // Update local state
             setPhotoCount(prev => prev + 1);
@@ -420,13 +424,17 @@ export default function CaptureInterface({ project }: Props) {
         // Save to IndexedDB
         await saveAudio(audioMetadata);
 
-        // Update project audio count
-        const updatedProject = {
-          ...project,
-          audioCount: (project.audioCount || 0) + 1,
-          modifiedAt: new Date().toISOString(),
-        };
-        await updateProject(updatedProject);
+        // Read current project from DB to get accurate audio count
+        const currentProject = await getProject(project.id);
+        if (currentProject) {
+          // Update project audio count
+          const updatedProject = {
+            ...currentProject,
+            audioCount: (currentProject.audioCount || 0) + 1,
+            modifiedAt: new Date().toISOString(),
+          };
+          await updateProject(updatedProject);
+        }
 
         console.log('Audio saved successfully:', {
           id: audioMetadata.id,
