@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Project } from '../lib/types';
 import { getAllProjects } from '../lib/db';
@@ -12,30 +12,7 @@ export default function ProjectsList() {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  useEffect(() => {
-    loadProjects();
-
-    // Reload projects when page becomes visible (e.g., when navigating back)
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        loadProjects();
-      }
-    };
-
-    const handleFocus = () => {
-      loadProjects();
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', handleFocus);
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleFocus);
-    };
-  }, []);
-
-  const loadProjects = async () => {
+  const loadProjects = useCallback(async () => {
     try {
       const allProjects = await getAllProjects();
       setProjects(allProjects);
@@ -44,7 +21,41 @@ export default function ProjectsList() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    // Always reload on mount/remount (which happens when navigating back)
+    loadProjects();
+
+    // Also reload when page becomes visible
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('Page visible, reloading projects');
+        loadProjects();
+      }
+    };
+
+    const handleFocus = () => {
+      console.log('Window focused, reloading projects');
+      loadProjects();
+    };
+
+    // Set up a periodic refresh every 2 seconds when page is active
+    const intervalId = setInterval(() => {
+      if (!document.hidden) {
+        loadProjects();
+      }
+    }, 2000);
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [loadProjects]);
 
   const handleProjectClick = (projectId: string) => {
     router.push(`/capture/${projectId}`);
