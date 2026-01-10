@@ -30,7 +30,9 @@ export default function CaptureInterface({ project }: Props) {
 
   // Initialize camera once when starting recording
   useEffect(() => {
+    console.log('Camera effect triggered - sessionState:', sessionState, 'stream:', stream ? 'exists' : 'null');
     if (sessionState === 'RECORDING' && !stream) {
+      console.log('Conditions met, calling initializeCamera()');
       initializeCamera();
     }
     // Only cleanup stream on unmount or when ending session
@@ -70,6 +72,7 @@ export default function CaptureInterface({ project }: Props) {
   }, [sessionState]);
 
   const initializeCamera = async () => {
+    console.log('Initializing camera...');
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: {
@@ -78,6 +81,8 @@ export default function CaptureInterface({ project }: Props) {
           height: { ideal: 1080 }
         }
       });
+
+      console.log('Camera stream obtained:', mediaStream.getVideoTracks().length, 'video tracks');
 
       // Set stream first
       setStream(mediaStream);
@@ -92,9 +97,11 @@ export default function CaptureInterface({ project }: Props) {
       }
 
       setError(null);
+      console.log('Camera initialized successfully');
     } catch (err) {
+      const error = err as Error;
       setError('Camera access denied or unavailable');
-      console.error('Camera initialization error:', err);
+      console.error('Camera initialization error:', error.name, error.message);
     }
   };
 
@@ -163,6 +170,7 @@ export default function CaptureInterface({ project }: Props) {
   }, []);
 
   const handleStartSession = () => {
+    console.log('Starting session for project:', project.name);
     setSessionState('RECORDING');
     setDuration(0);
     initializeGps();
