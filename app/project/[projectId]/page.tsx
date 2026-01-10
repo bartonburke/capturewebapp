@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Project, PhotoMetadata, AudioMetadata } from '../../lib/types';
 import { getProject, getProjectPhotos, getProjectAudio } from '../../lib/db';
@@ -14,7 +14,11 @@ export default function ProjectDetailsPage() {
   const [photos, setPhotos] = useState<PhotoMetadata[]>([]);
   const [audio, setAudio] = useState<AudioMetadata[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedPhoto, setSelectedPhoto] = useState<PhotoMetadata | null>(null);
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
+
+  // Touch handling for swipe
+  const touchStartX = useRef<number>(0);
+  const touchEndX = useRef<number>(0);
 
   useEffect(() => {
     loadProjectData();
@@ -66,6 +70,43 @@ export default function ProjectDetailsPage() {
     return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
   };
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchEndX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = () => {
+    if (selectedPhotoIndex === null) return;
+
+    const swipeDistance = touchStartX.current - touchEndX.current;
+    const minSwipeDistance = 50;
+
+    if (Math.abs(swipeDistance) > minSwipeDistance) {
+      if (swipeDistance > 0) {
+        // Swipe left - next photo
+        navigatePhoto('next');
+      } else {
+        // Swipe right - previous photo
+        navigatePhoto('prev');
+      }
+    }
+  };
+
+  const navigatePhoto = (direction: 'next' | 'prev') => {
+    if (selectedPhotoIndex === null) return;
+
+    if (direction === 'next' && selectedPhotoIndex < photos.length - 1) {
+      setSelectedPhotoIndex(selectedPhotoIndex + 1);
+    } else if (direction === 'prev' && selectedPhotoIndex > 0) {
+      setSelectedPhotoIndex(selectedPhotoIndex - 1);
+    }
+  };
+
+  const selectedPhoto = selectedPhotoIndex !== null ? photos[selectedPhotoIndex] : null;
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
@@ -91,8 +132,8 @@ export default function ProjectDetailsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 pb-safe">
-      {/* Header */}
+    <div className="min-h-screen bg-gray-900 overflow-y-auto pb-24">
+      {/* Header - Sticky */}
       <div className="bg-gray-800 border-b border-gray-700 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex items-center gap-3 mb-3">
@@ -105,13 +146,13 @@ export default function ProjectDetailsPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
-            <div className="flex-1">
-              <h1 className="text-white font-semibold text-xl">{project.name}</h1>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-white font-semibold text-xl truncate">{project.name}</h1>
               <p className="text-gray-400 text-sm">Lead: {project.lead}</p>
             </div>
             <button
               onClick={() => router.push(`/capture/${projectId}`)}
-              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors"
+              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors flex-shrink-0"
             >
               Resume
             </button>
@@ -136,6 +177,7 @@ export default function ProjectDetailsPage() {
         </div>
       </div>
 
+      {/* Scrollable Content */}
       <div className="max-w-4xl mx-auto px-4 py-6">
         {/* Audio Section */}
         {audio.length > 0 && (
@@ -173,13 +215,13 @@ export default function ProjectDetailsPage() {
 
         {/* Photos Section */}
         {photos.length > 0 ? (
-          <section>
+          <section className="pb-6">
             <h2 className="text-white font-semibold text-lg mb-4">Photos</h2>
             <div className="grid grid-cols-2 gap-3">
-              {photos.map((photo) => (
+              {photos.map((photo, index) => (
                 <button
                   key={photo.id}
-                  onClick={() => setSelectedPhoto(photo)}
+                  onClick={() => setSelectedPhotoIndex(index)}
                   className="relative aspect-square bg-gray-800 rounded-lg overflow-hidden border border-gray-700 hover:border-blue-500 transition-colors"
                 >
                   <img
@@ -187,14 +229,24 @@ export default function ProjectDetailsPage() {
                     alt={`Photo from ${formatTimestamp(photo.timestamp)}`}
                     className="w-full h-full object-cover"
                   />
-                  {photo.gps && (
-                    <div className="absolute bottom-2 left-2 bg-black/70 px-2 py-1 rounded text-xs text-white flex items-center gap-1">
-                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-                      </svg>
-                      ±{Math.round(photo.gps.accuracy)}m
-                    </div>
-                  )}
+                  {/* GPS Overlay */}
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-2">
+                    {photo.gps ? (
+                      <>
+                        <div className="flex items-center gap-1 text-white text-xs mb-0.5">
+                          <svg className="w-3 h-3 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                          </svg>
+                          <span className="font-mono">±{Math.round(photo.gps.accuracy)}m</span>
+                        </div>
+                        <div className="text-[10px] text-gray-300 font-mono truncate">
+                          {photo.gps.latitude.toFixed(4)}, {photo.gps.longitude.toFixed(4)}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-xs text-gray-400">No GPS</div>
+                    )}
+                  </div>
                 </button>
               ))}
             </div>
@@ -216,18 +268,20 @@ export default function ProjectDetailsPage() {
       </div>
 
       {/* Photo Detail Modal */}
-      {selectedPhoto && (
+      {selectedPhoto && selectedPhotoIndex !== null && (
         <div
-          className="fixed inset-0 bg-black/95 z-50 flex flex-col"
-          onClick={() => setSelectedPhoto(null)}
+          className="fixed inset-0 bg-black z-50 flex flex-col"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-4 bg-black/50">
+          <div className="flex items-center justify-between p-4 bg-black/80">
             <div className="text-white text-sm">
-              {formatTimestamp(selectedPhoto.timestamp)}
+              {selectedPhotoIndex + 1} / {photos.length}
             </div>
             <button
-              onClick={() => setSelectedPhoto(null)}
+              onClick={() => setSelectedPhotoIndex(null)}
               className="text-white hover:text-gray-300"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -237,37 +291,65 @@ export default function ProjectDetailsPage() {
           </div>
 
           {/* Image */}
-          <div className="flex-1 flex items-center justify-center p-4">
+          <div className="flex-1 flex items-center justify-center relative">
             <img
               src={selectedPhoto.imageData}
               alt="Full size photo"
               className="max-w-full max-h-full object-contain"
-              onClick={(e) => e.stopPropagation()}
             />
+
+            {/* Navigation Arrows */}
+            {selectedPhotoIndex > 0 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigatePhoto('prev');
+                }}
+                className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-3 rounded-full"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+            )}
+
+            {selectedPhotoIndex < photos.length - 1 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigatePhoto('next');
+                }}
+                className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-3 rounded-full"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            )}
           </div>
 
-          {/* Metadata */}
-          <div className="bg-black/50 p-4 text-white text-sm space-y-2" onClick={(e) => e.stopPropagation()}>
+          {/* Metadata Footer */}
+          <div className="bg-black/80 p-4 text-white space-y-2">
+            <div className="text-sm text-gray-300">
+              {formatTimestamp(selectedPhoto.timestamp)}
+            </div>
             {selectedPhoto.gps ? (
               <>
                 <div className="flex items-center gap-2">
                   <svg className="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
                   </svg>
-                  <span className="text-gray-300">
+                  <span className="text-gray-300 font-mono text-sm">
                     {selectedPhoto.gps.latitude.toFixed(6)}, {selectedPhoto.gps.longitude.toFixed(6)}
                   </span>
                 </div>
                 <div className="text-gray-400 text-xs">
-                  Accuracy: ±{Math.round(selectedPhoto.gps.accuracy)}m
+                  Accuracy: ±{Math.round(selectedPhoto.gps.accuracy)}m • Session: {formatDuration(selectedPhoto.sessionTimestamp)}
                 </div>
               </>
             ) : (
-              <div className="text-gray-400">No GPS data available</div>
+              <div className="text-gray-400 text-sm">No GPS data • Session: {formatDuration(selectedPhoto.sessionTimestamp)}</div>
             )}
-            <div className="text-gray-400 text-xs">
-              Session time: {formatDuration(selectedPhoto.sessionTimestamp)}
-            </div>
           </div>
         </div>
       )}
