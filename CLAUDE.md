@@ -3,40 +3,43 @@
 ## Project Overview
 Mobile-first PWA for capturing Phase 1 Environmental Site Assessment (ESA) data on iOS Safari. Combines continuous audio recording, photo capture with GPS, and timestamp correlation for AI-assisted report generation.
 
-**Status**: Prototype with Projects management + GPS-tagged photo capture + IndexedDB persistence
+**Status**: Fully functional prototype with audio recording, GPS-tagged photos, and project review interface
 
 ## Tech Stack
 - **Framework**: Next.js 16 (App Router) + React 19 + TypeScript
 - **Styling**: Tailwind CSS 4
 - **Storage**: IndexedDB (browser-based persistence)
 - **Target Platform**: iOS Safari (PWA mode)
-- **APIs Used**: MediaDevices (camera), Geolocation (GPS), IndexedDB (storage), MediaRecorder (audio - not yet implemented)
+- **APIs Used**: MediaDevices (camera), Geolocation (GPS), IndexedDB (storage), MediaRecorder (audio)
 
 ## Current Implementation Status
 
 ### ✅ Completed Features
 - [x] **Projects Management** - Home screen with projects list, create/resume projects
-- [x] **IndexedDB Persistence** - Projects and photos stored locally with full metadata
+- [x] **IndexedDB Persistence** - Projects, photos, and audio stored locally with full metadata
 - [x] **GPS Integration** - Real-time GPS tracking with accuracy display, coordinates saved per photo
-- [x] **Dynamic Routing** - Navigate between projects list and capture interface (`/capture/[projectId]`)
+- [x] **Continuous Audio Recording** - MediaRecorder captures audio during sessions with pause/resume
+- [x] **Project Review Page** - Photo gallery with swipe navigation and audio playback
+- [x] **Dynamic Routing** - `/` (projects list) → `/project/[id]` (review) → `/capture/[id]` (capture)
 - [x] Capture UI with session state management (NOT_STARTED → RECORDING → PAUSED → ENDED)
 - [x] Rear camera access with live preview
 - [x] Photo capture with flash feedback + base64 storage
-- [x] Session timer (HH:MM:SS format) and photo counter
-- [x] Pause/Resume with camera stream persistence (no black screen)
+- [x] Session timer (HH:MM:SS format) and photo/audio counters
+- [x] Pause/Resume with camera/audio stream persistence (no black screen)
 - [x] GPS status indicator (acquiring/active/error with accuracy)
-- [x] Back navigation to projects list
-- [x] iOS Safari optimizations (safe area handling, no pull-to-refresh)
+- [x] GPS coordinates visible on photo thumbnails and fullscreen view
+- [x] Swipe gestures for photo navigation in fullscreen
+- [x] Back navigation throughout app
+- [x] iOS Safari optimizations (safe area handling, no pull-to-refresh, scrolling)
 - [x] PWA manifest for home screen installation
 
 ### 🚧 Next Up
-- [ ] Continuous audio recording during session
-- [ ] Project details/review page (view captured photos)
 
 ### 📋 Planned Features
 - [ ] Post-session processing (Whisper transcription + Claude Vision analysis)
-- [ ] Review/gallery interface
-- [ ] Export structured JSON
+- [ ] Export structured JSON (photos + audio + GPS metadata)
+- [ ] Delete photos/audio from review page
+- [ ] Share/download individual photos
 - [ ] On-device computer vision demo
 
 ## Architecture Decisions
@@ -69,14 +72,16 @@ Mobile-first PWA for capturing Phase 1 Environmental Site Assessment (ESA) data 
 ```
 app/
 ├── lib/
-│   ├── types.ts                 # Shared TypeScript interfaces (Project, PhotoMetadata, GPS)
-│   └── db.ts                    # IndexedDB utilities (CRUD for projects/photos)
+│   ├── types.ts                 # TypeScript interfaces (Project, PhotoMetadata, AudioMetadata, GPS)
+│   └── db.ts                    # IndexedDB utilities (CRUD for projects/photos/audio)
 ├── components/
-│   ├── CaptureInterface.tsx     # Photo capture UI with GPS (~420 lines)
-│   ├── ProjectsList.tsx         # Projects home screen (~110 lines)
+│   ├── CaptureInterface.tsx     # Camera/audio capture UI (~700 lines)
+│   ├── ProjectsList.tsx         # Projects home screen (~140 lines)
 │   └── CreateProjectModal.tsx   # Create project form (~110 lines)
 ├── capture/[projectId]/
-│   └── page.tsx                 # Dynamic route for project capture
+│   └── page.tsx                 # Dynamic route for capture interface
+├── project/[projectId]/
+│   └── page.tsx                 # Project details/review page (~360 lines)
 ├── globals.css                  # iOS-optimized mobile styles
 ├── layout.tsx                   # Root layout with PWA meta tags
 └── page.tsx                     # Entry point (renders ProjectsList)
@@ -102,6 +107,7 @@ interface Project {
   createdAt: string;       // ISO8601
   modifiedAt: string;      // ISO8601
   photoCount: number;      // Total photos
+  audioCount: number;      // Total audio recordings
 }
 
 interface GpsCoordinates {
@@ -119,11 +125,23 @@ interface PhotoMetadata {
   imageData: string;       // Base64 encoded JPEG
   sessionTimestamp: number;  // Session duration when captured
 }
+
+interface AudioMetadata {
+  id: string;              // UUID
+  projectId: string;       // Links to parent project
+  sessionId: string;       // Groups recordings from same session
+  audioData: string;       // Base64 encoded audio (webm/mp4)
+  duration: number;        // Recording duration in seconds
+  mimeType: string;        // audio/webm or audio/mp4
+  timestamp: string;       // ISO8601
+  fileSize: number;        // Bytes
+}
 ```
 
-### IndexedDB Schema (`choragraph-capture` database)
+### IndexedDB Schema (`choragraph-capture` database, version 2)
 - **projects** store - Projects with keyPath `id`, indexed by `modifiedAt`
 - **photos** store - Photos with keyPath `id`, indexed by `projectId` and `timestamp`
+- **audio** store - Audio recordings with keyPath `id`, indexed by `projectId`, `sessionId`, and `timestamp`
 
 ## Development Workflow
 
@@ -147,10 +165,10 @@ Use ngrok HTTPS URL on iPhone Safari, then add to home screen for PWA mode.
 
 1. **Camera & GPS Permissions**: Require HTTPS on iOS. Use ngrok for local dev.
 2. **Node Version**: Requires Node 20.9.0+ (Next.js 16 requirement)
-3. **Base64 Storage**: Photos stored as base64 strings - may impact performance with many photos
-4. **No Audio Recording**: MediaRecorder not yet implemented
-5. **No Photo Review**: Can't view captured photos yet (only counter updates)
-6. **Private Browsing**: IndexedDB unavailable in Safari private mode
+3. **Base64 Storage**: Photos and audio stored as base64 - may impact performance with large projects
+4. **Private Browsing**: IndexedDB unavailable in Safari private mode
+5. **No Delete Functionality**: Cannot delete individual photos or audio recordings yet
+6. **No Export**: Cannot export project data to JSON or other formats yet
 
 ## Key Code Patterns
 
@@ -232,15 +250,31 @@ canvas.toBlob(async (blob) => {
 - [ ] Data persists after page refresh
 
 ### Capture Interface
-- [ ] Camera preview loads (rear camera)
-- [ ] GPS indicator appears (yellow → green with accuracy)
-- [ ] Photo capture works (flash + count increment + IndexedDB save)
-- [ ] Photos save with GPS coordinates (check console log)
-- [ ] GPS denied/unavailable → photos still work (gps: null)
-- [ ] Pause stops timer, disables capture button
-- [ ] Resume keeps camera live, re-enables capture
-- [ ] End session stops camera & GPS, shows summary
-- [ ] All buttons tappable above Safari bar
+- [x] Camera preview loads (rear camera)
+- [x] GPS indicator appears (yellow → green with accuracy)
+- [x] Photo capture works (flash + count increment + IndexedDB save)
+- [x] Photos save with GPS coordinates (check console log)
+- [x] GPS denied/unavailable → photos still work (gps: null)
+- [x] Audio recording starts/pauses/resumes with session
+- [x] Audio chunks collected and saved on session end
+- [x] Pause stops timer, disables capture button, pauses audio
+- [x] Resume keeps camera/audio live, re-enables capture
+- [x] End session stops camera/audio/GPS, shows summary, saves audio
+- [x] All buttons tappable above Safari bar
+
+### Project Review Page
+- [x] Project details page loads with correct stats
+- [x] Photo gallery displays all photos in 2-column grid
+- [x] GPS coordinates visible on photo thumbnails
+- [x] Click photo to view fullscreen
+- [x] Swipe left/right to navigate between photos
+- [x] Arrow buttons work for photo navigation
+- [x] GPS metadata shown in fullscreen footer
+- [x] Audio recordings section displays all sessions
+- [x] Audio playback works on iOS Safari
+- [x] Page scrolls properly to see all content
+- [x] Resume button navigates to capture interface
+- [x] Back button returns to projects list
 
 ### iOS Safari Specific
 - [ ] HTTPS via ngrok for camera + GPS permissions
@@ -250,9 +284,10 @@ canvas.toBlob(async (blob) => {
 - [ ] No pull-to-refresh interference
 
 ## Next Session Goals
-1. **Audio Recording**: MediaRecorder integration for continuous recording during session
-2. **Photo Review Interface**: View captured photos from project details page
-3. **Export Functionality**: Export project data (photos + GPS + metadata) to JSON
+1. **Export Functionality**: Export project data (photos + audio + GPS metadata) to JSON
+2. **Delete Functionality**: Delete individual photos or audio recordings from review page
+3. **Share/Download**: Share or download individual photos with metadata
+4. **Post-Session AI Processing**: Whisper transcription + Claude Vision analysis
 
 ## Useful Context for AI Assistants
 
@@ -276,4 +311,26 @@ canvas.toBlob(async (blob) => {
 ---
 
 **Last Updated**: 2026-01-09
-**Current Commit**: 9cea238 - "Implement ChoraGraph Capture PWA with iOS-optimized session UI"
+**Current Commit**: 3a131e3 - "Fix scrolling, add swipe navigation, and show GPS on photo thumbnails"
+
+## Session Summary (2026-01-09)
+
+### Completed Today
+1. ✅ **Audio Recording** - Full MediaRecorder integration with pause/resume lifecycle
+2. ✅ **Project Review Page** - Photo gallery with GPS display and audio playback
+3. ✅ **Swipe Navigation** - Touch gestures for navigating between photos
+4. ✅ **Bug Fixes** - Fixed stale project prop causing incorrect photo/audio counts
+5. ✅ **UI Improvements** - GPS coordinates on thumbnails, scrolling fixes, navigation arrows
+
+### Key Commits
+- `67ef5ac` - Fix stale project prop causing incorrect photo/audio counts
+- `22fdfd9` - Add project details/review page with photo gallery and audio playback
+- `3a131e3` - Fix scrolling, add swipe navigation, and show GPS on photo thumbnails
+
+### Testing Status
+All core features tested and working on iOS Safari via ngrok:
+- ✅ Photo capture with GPS tagging
+- ✅ Audio recording during sessions
+- ✅ Project review with photo gallery
+- ✅ Swipe gestures for photo navigation
+- ✅ Data persistence in IndexedDB
