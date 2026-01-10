@@ -14,6 +14,25 @@ export default function ProjectsList() {
 
   useEffect(() => {
     loadProjects();
+
+    // Reload projects when page becomes visible (e.g., when navigating back)
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        loadProjects();
+      }
+    };
+
+    const handleFocus = () => {
+      loadProjects();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   const loadProjects = async () => {
