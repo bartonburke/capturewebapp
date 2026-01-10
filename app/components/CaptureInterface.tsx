@@ -252,11 +252,11 @@ export default function CaptureInterface({ project }: Props) {
 
   // Audio recorder lifecycle - start/pause/resume/stop based on sessionState
   useEffect(() => {
-    console.log('Audio effect triggered - sessionState:', sessionState, 'recorder:', audioRecorder ? 'exists' : 'null');
+    console.log('Audio effect triggered - sessionState:', sessionState, 'recorder:', audioRecorder ? `state=${audioRecorder.state}` : 'null');
 
     if (!audioRecorder) return;
 
-    if (sessionState === 'RECORDING' && audioRecorder.state !== 'recording') {
+    if (sessionState === 'RECORDING' && audioRecorder.state === 'inactive') {
       console.log('Starting audio recording');
       audioRecorder.start(1000); // Collect data every 1 second
     } else if (sessionState === 'PAUSED' && audioRecorder.state === 'recording') {
