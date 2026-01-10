@@ -1,9 +1,9 @@
 // IndexedDB utilities for ChoraGraph Capture PWA
 
-import { Project, PhotoMetadata } from './types';
+import { Project, PhotoMetadata, AudioMetadata } from './types';
 
 const DB_NAME = 'choragraph-capture';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 // Initialize database
 export async function initDB(): Promise<IDBDatabase> {
@@ -27,6 +27,14 @@ export async function initDB(): Promise<IDBDatabase> {
         const photoStore = db.createObjectStore('photos', { keyPath: 'id' });
         photoStore.createIndex('projectId', 'projectId', { unique: false });
         photoStore.createIndex('timestamp', 'timestamp', { unique: false });
+      }
+
+      // Create audio store
+      if (!db.objectStoreNames.contains('audio')) {
+        const audioStore = db.createObjectStore('audio', { keyPath: 'id' });
+        audioStore.createIndex('projectId', 'projectId', { unique: false });
+        audioStore.createIndex('sessionId', 'sessionId', { unique: false });
+        audioStore.createIndex('timestamp', 'timestamp', { unique: false });
       }
     };
   });
@@ -94,6 +102,37 @@ export async function getProjectPhotos(projectId: string): Promise<PhotoMetadata
   return new Promise((resolve, reject) => {
     const request = index.getAll(projectId);
     request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+// Audio CRUD operations
+export async function saveAudio(audio: AudioMetadata): Promise<void> {
+  const db = await initDB();
+  const tx = db.transaction('audio', 'readwrite');
+  await tx.objectStore('audio').add(audio);
+}
+
+export async function getProjectAudio(projectId: string): Promise<AudioMetadata[]> {
+  const db = await initDB();
+  const tx = db.transaction('audio', 'readonly');
+  const index = tx.objectStore('audio').index('projectId');
+
+  return new Promise((resolve, reject) => {
+    const request = index.getAll(projectId);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function getSessionAudio(sessionId: string): Promise<AudioMetadata | null> {
+  const db = await initDB();
+  const tx = db.transaction('audio', 'readonly');
+  const index = tx.objectStore('audio').index('sessionId');
+
+  return new Promise((resolve, reject) => {
+    const request = index.get(sessionId);
+    request.onsuccess = () => resolve(request.result || null);
     request.onerror = () => reject(request.error);
   });
 }

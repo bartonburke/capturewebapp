@@ -29,6 +29,7 @@ export default function CreateProjectModal({ onClose, onProjectCreated }: Props)
         createdAt: new Date().toISOString(),
         modifiedAt: new Date().toISOString(),
         photoCount: 0,
+        audioCount: 0,
       };
 
       await createProject(project);

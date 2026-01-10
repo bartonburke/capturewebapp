@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Project, SessionState, GpsStatus, GpsCoordinates, PhotoMetadata } from '../lib/types';
-import { savePhoto, updateProject } from '../lib/db';
+import { Project, SessionState, GpsStatus, GpsCoordinates, PhotoMetadata, AudioMetadata } from '../lib/types';
+import { savePhoto, updateProject, saveAudio } from '../lib/db';
 
 interface Props {
   project: Project;
@@ -23,6 +23,12 @@ export default function CaptureInterface({ project }: Props) {
   const [currentGps, setCurrentGps] = useState<GpsCoordinates | null>(null);
   const [gpsError, setGpsError] = useState<string | null>(null);
 
+  // Audio recording state
+  const [audioRecorder, setAudioRecorder] = useState<MediaRecorder | null>(null);
+  const [audioError, setAudioError] = useState<string | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const sessionIdRef = useRef<string>(crypto.randomUUID());
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -35,6 +41,12 @@ export default function CaptureInterface({ project }: Props) {
       console.log('Conditions met, calling initializeCamera()');
       initializeCamera();
     }
+
+    // Initialize audio recorder when stream is available and recording
+    if (sessionState === 'RECORDING' && stream && !audioRecorder) {
+      initializeAudioRecorder(stream);
+    }
+
     // Only cleanup stream on unmount or when ending session
     // Don't stop tracks during pause/resume cycle
     return () => {
@@ -42,7 +54,7 @@ export default function CaptureInterface({ project }: Props) {
         stream.getTracks().forEach(track => track.stop());
       }
     };
-  }, [sessionState, stream]);
+  }, [sessionState, stream, audioRecorder]);
 
   // Attach stream to video element when stream changes
   useEffect(() => {
@@ -79,10 +91,18 @@ export default function CaptureInterface({ project }: Props) {
           facingMode: 'environment', // rear camera
           width: { ideal: 1920 },
           height: { ideal: 1080 }
+        },
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
         }
       });
 
-      console.log('Camera stream obtained:', mediaStream.getVideoTracks().length, 'video tracks');
+      console.log('Media stream obtained:',
+        mediaStream.getVideoTracks().length, 'video tracks,',
+        mediaStream.getAudioTracks().length, 'audio tracks'
+      );
 
       // Set stream first
       setStream(mediaStream);
@@ -100,8 +120,69 @@ export default function CaptureInterface({ project }: Props) {
       console.log('Camera initialized successfully');
     } catch (err) {
       const error = err as Error;
-      setError('Camera access denied or unavailable');
-      console.error('Camera initialization error:', error.name, error.message);
+
+      if (error.name === 'NotAllowedError') {
+        if (error.message?.includes('audio') || error.message?.includes('microphone')) {
+          setAudioError('Microphone permission denied');
+          setError('Camera access granted but microphone denied');
+        } else {
+          setError('Camera access denied or unavailable');
+        }
+      } else {
+        setError('Camera/microphone access denied or unavailable');
+      }
+
+      console.error('Media initialization error:', error.name, error.message);
+    }
+  };
+
+  const initializeAudioRecorder = (stream: MediaStream) => {
+    try {
+      // Check if audio tracks exist
+      const audioTracks = stream.getAudioTracks();
+      if (audioTracks.length === 0) {
+        setAudioError('No audio track available');
+        return;
+      }
+
+      console.log('Initializing audio recorder...');
+
+      // Determine best supported mime type
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm')
+        ? 'audio/webm'
+        : 'audio/mp4'; // Fallback for iOS
+
+      const recorder = new MediaRecorder(stream, { mimeType });
+
+      // Collect audio chunks as they're available
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+          console.log('Audio chunk received:', event.data.size, 'bytes');
+        }
+      };
+
+      // Handle recording stop
+      recorder.onstop = async () => {
+        console.log('Audio recording stopped, processing...');
+        await saveAudioRecording();
+      };
+
+      recorder.onerror = (event) => {
+        console.error('MediaRecorder error:', event);
+        setAudioError('Audio recording error occurred');
+      };
+
+      setAudioRecorder(recorder);
+      setAudioError(null);
+      console.log('Audio recorder initialized with mimeType:', mimeType);
+
+    } catch (err) {
+      const error = err as Error;
+      console.error('Failed to initialize audio recorder:', error);
+      setAudioError('Failed to initialize audio recording');
     }
   };
 
@@ -169,11 +250,45 @@ export default function CaptureInterface({ project }: Props) {
     };
   }, []);
 
+  // Audio recorder lifecycle - start/pause/resume/stop based on sessionState
+  useEffect(() => {
+    console.log('Audio effect triggered - sessionState:', sessionState, 'recorder:', audioRecorder ? 'exists' : 'null');
+
+    if (!audioRecorder) return;
+
+    if (sessionState === 'RECORDING' && audioRecorder.state !== 'recording') {
+      console.log('Starting audio recording');
+      audioRecorder.start(1000); // Collect data every 1 second
+    } else if (sessionState === 'PAUSED' && audioRecorder.state === 'recording') {
+      console.log('Pausing audio recording');
+      audioRecorder.pause();
+    } else if (sessionState === 'RECORDING' && audioRecorder.state === 'paused') {
+      console.log('Resuming audio recording');
+      audioRecorder.resume();
+    } else if (sessionState === 'ENDED' && audioRecorder.state !== 'inactive') {
+      console.log('Stopping audio recording');
+      audioRecorder.stop();
+    }
+
+  }, [sessionState, audioRecorder]);
+
   const handleStartSession = () => {
     console.log('Starting session for project:', project.name);
+
+    // Generate new session ID for this capture session
+    sessionIdRef.current = crypto.randomUUID();
+
+    // Reset audio chunks for new session
+    audioChunksRef.current = [];
+
     setSessionState('RECORDING');
     setDuration(0);
     initializeGps();
+
+    // Initialize audio recorder when stream is ready
+    if (stream) {
+      initializeAudioRecorder(stream);
+    }
   };
 
   const handleCapturePhoto = async () => {
@@ -268,13 +383,90 @@ export default function CaptureInterface({ project }: Props) {
     }
   };
 
+  const saveAudioRecording = async () => {
+    try {
+      if (audioChunksRef.current.length === 0) {
+        console.log('No audio chunks to save');
+        return;
+      }
+
+      console.log('Saving audio recording:', audioChunksRef.current.length, 'chunks');
+
+      // Combine all audio chunks into single blob
+      const audioBlob = new Blob(audioChunksRef.current, {
+        type: audioRecorder?.mimeType || 'audio/webm'
+      });
+
+      console.log('Audio blob created:', audioBlob.size, 'bytes');
+
+      // Convert to base64
+      const reader = new FileReader();
+      reader.readAsDataURL(audioBlob);
+
+      reader.onloadend = async () => {
+        const base64Audio = reader.result as string;
+
+        const audioMetadata: AudioMetadata = {
+          id: crypto.randomUUID(),
+          projectId: project.id,
+          sessionId: sessionIdRef.current,
+          audioData: base64Audio,
+          duration: duration,
+          mimeType: audioRecorder?.mimeType || 'audio/webm',
+          timestamp: new Date().toISOString(),
+          fileSize: audioBlob.size,
+        };
+
+        // Save to IndexedDB
+        await saveAudio(audioMetadata);
+
+        // Update project audio count
+        const updatedProject = {
+          ...project,
+          audioCount: (project.audioCount || 0) + 1,
+          modifiedAt: new Date().toISOString(),
+        };
+        await updateProject(updatedProject);
+
+        console.log('Audio saved successfully:', {
+          id: audioMetadata.id,
+          sessionId: audioMetadata.sessionId,
+          duration: audioMetadata.duration,
+          size: `${(audioMetadata.fileSize / 1024 / 1024).toFixed(2)} MB`
+        });
+
+        // Clear chunks after saving
+        audioChunksRef.current = [];
+      };
+
+      reader.onerror = (error) => {
+        console.error('Failed to convert audio to base64:', error);
+        throw error;
+      };
+
+    } catch (error) {
+      console.error('Failed to save audio:', error);
+      alert('Failed to save audio recording. Please try again.');
+    }
+  };
+
   const handleEndSession = () => {
     setSessionState('ENDED');
     stopGps();
+
+    // Stop audio recorder (will trigger onstop callback which saves audio)
+    if (audioRecorder && audioRecorder.state !== 'inactive') {
+      audioRecorder.stop();
+    }
+
+    // Stop all media tracks
     if (stream) {
       stream.getTracks().forEach(track => track.stop());
       setStream(null);
     }
+
+    // Reset audio recorder
+    setAudioRecorder(null);
   };
 
   const formatDuration = (seconds: number): string => {
@@ -381,6 +573,11 @@ export default function CaptureInterface({ project }: Props) {
             <div className="flex items-center gap-2">
               <div className={`w-2 h-2 rounded-full ${getStatusColor()} ${sessionState === 'RECORDING' ? 'animate-pulse' : ''}`} />
               <span className="text-white text-sm font-medium">{getStatusText()}</span>
+
+              {/* Audio recording dot */}
+              {audioRecorder?.state === 'recording' && (
+                <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse ml-1" />
+              )}
             </div>
 
             {/* GPS Status */}
@@ -409,6 +606,21 @@ export default function CaptureInterface({ project }: Props) {
         {gpsError && sessionState !== 'NOT_STARTED' && sessionState !== 'ENDED' && (
           <div className="mt-2 bg-red-600/90 text-white text-xs px-3 py-2 rounded">
             GPS: {gpsError}
+          </div>
+        )}
+
+        {/* Audio Error Display */}
+        {audioError && sessionState !== 'NOT_STARTED' && sessionState !== 'ENDED' && (
+          <div className="mt-2 bg-orange-600/90 text-white text-xs px-3 py-2 rounded">
+            Audio: {audioError}
+          </div>
+        )}
+
+        {/* Audio Recording Indicator */}
+        {sessionState === 'RECORDING' && audioRecorder?.state === 'recording' && (
+          <div className="mt-2 flex items-center gap-2 text-xs">
+            <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+            <span className="text-white/80">Recording audio</span>
           </div>
         )}
       </div>
