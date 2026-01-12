@@ -1,20 +1,37 @@
-# ChoraGraph ESA Capture App — Product Requirements Document
+# ChoraGraph Capture — Product Requirements Document
 
-**Version:** 0.1 (Prototype)  
+**Version:** 0.3 (Prototype)  
 **Date:** January 9, 2026  
 **Author:** Bart Burke + Claude  
 
+> **See also:** [VISION.md](./VISION.md) for the broader ChoraGraph platform vision
+
 ---
 
-## 1. Problem Statement
+## 1. Context
+
+ChoraGraph is a spatial interface layer for work done in the real world. It has two modes:
+
+| Mode | Interface | Purpose |
+|------|-----------|---------|
+| **Capture** | Camera | Collect evidence in the field — photos, audio, observations anchored to location |
+| **View** | Map | See, navigate, and act on spatial data — browse captured content, deep link to other apps |
+
+**This prototype builds Capture mode.**
+
+---
+
+## 2. Problem Statement
 
 Phase 1 Environmental Site Assessments (ESAs) require site reconnaissance where environmental professionals walk properties capturing photos, observations, and notes. Current workflows are fragmented: photos in the camera roll, voice memos in a separate app, handwritten notes, GPS logged elsewhere. This data must later be manually assembled, correlated, and structured for the ESA report.
 
 There is no tool that captures all site data in a unified, structured, spatially-aware format that feeds directly into AI-assisted report generation.
 
+**The ChoraGraph vision:** Field capture is just the beginning. Back at their desk, this semi-structured visual data awaits them in the SimAnalytica engine. The Project Map has a GIS Assistant to help visualize all key project data—EDR reports, surrounding parcels, potential RECs—and populate the map with relevant layers. A whole range of AI tools for the job at hand are available within this environment, turning raw field capture into actionable intelligence and draft reports.
+
 ---
 
-## 2. Solution Overview
+## 3. Solution Overview
 
 A mobile-first web app (PWA) optimized for Safari/iOS that enables field professionals to capture site assessment data—photos, continuous audio/dictation, and GPS—in a single session. Post-session processing transcribes audio, correlates transcript segments to photos via timestamps, analyzes images with vision AI, and extracts ESA-relevant concepts (RECs, site features, observations). The output is a structured, graph-ready dataset.
 
@@ -22,7 +39,7 @@ This prototype demonstrates the core concept of **building a spatial knowledge g
 
 ---
 
-## 3. Target User
+## 4. Target User
 
 **Primary:** Environmental consultants conducting Phase 1 ESA site visits  
 **Context:** Walking a property, phone in hand, capturing evidence and observations on the go  
@@ -30,9 +47,9 @@ This prototype demonstrates the core concept of **building a spatial knowledge g
 
 ---
 
-## 4. Core Concepts
+## 5. Core Concepts
 
-### 4.1 Photo as the Atomic Unit
+### 5.1 Photo as the Atomic Unit
 
 Each photo becomes a **node in the knowledge graph**. Attached to each photo node:
 
@@ -43,7 +60,7 @@ Each photo becomes a **node in the knowledge graph**. Attached to each photo nod
 - Manual or auto-generated tags
 - (Future) Agent attachment point
 
-### 4.2 Continuous Audio → Structured Transcript
+### 5.2 Continuous Audio → Structured Transcript
 
 Audio recording runs continuously throughout the site visit. Post-session:
 
@@ -51,7 +68,7 @@ Audio recording runs continuously throughout the site visit. Post-session:
 2. AI processes transcript to extract ESA-relevant entities: RECs, ASTs, USTs, staining, interviews, historical indicators, regulatory observations
 3. Transcript segments are correlated to photos via timestamps
 
-### 4.3 Workflow-Specific Schema
+### 5.3 Workflow-Specific Schema
 
 The data schema is shaped by the job to be done. For Phase 1 ESA, relevant entity types include:
 
@@ -64,7 +81,7 @@ The data schema is shaped by the job to be done. For Phase 1 ESA, relevant entit
 
 The architecture supports swapping schemas for different workflows (e.g., construction inspection) without changing the capture flow.
 
-### 4.4 Spatial Agents (Conceptual)
+### 5.4 Spatial Agents (Conceptual)
 
 Agents live in places. In the knowledge graph:
 
@@ -79,19 +96,63 @@ For the prototype, the "agent" is Claude with ESA context + access to the photo 
 
 ---
 
-## 5. MVP Feature Set (Prototype Scope)
+## 6. MVP Feature Set (Prototype Scope)
 
-### 5.1 Capture Mode
+### 6.1 Capture Mode
 
-| Feature | Description |
+#### Session Header (Always Visible During Capture)
+| Element | Description |
 |---------|-------------|
-| **Continuous audio recording** | Single record button, runs throughout site visit |
-| **Photo capture** | Tap to capture, auto-attaches GPS + timestamp |
-| **GPS per photo** | Standard device GPS (high-precision SLAM deferred) |
-| **Visual feedback** | Live camera preview, recording indicator, photo count |
-| **Session management** | Start session, end session, basic metadata (site name) |
+| **Agent label** | "ESA Capture Agent" (simple text) |
+| **Session status** | Recording / Paused |
+| **Duration** | Elapsed time since session start |
+| **Photo count** | Number of photos captured this session |
 
-### 5.2 Post-Session Processing
+#### Live View
+- Rear camera preview (full screen behind controls)
+- Recording indicator (red dot/pulse when audio is live)
+
+#### Controls & States
+
+**RECORDING STATE:**
+| Control | Action |
+|---------|--------|
+| **📷 Capture** | Take photo (GPS + timestamp attached) |
+| **⏸️ Pause** | Pause audio recording, stay in session |
+| **⏹️ End** | End session → prompt for project name → upload |
+
+**PAUSED STATE:**
+| Control | Action |
+|---------|--------|
+| **📷 Capture** | **DISABLED** (grayed out, cannot take photos while paused) |
+| **▶️ Resume** | Resume audio recording, re-enable capture |
+| **⏹️ End** | End session → prompt for project name → upload |
+
+#### Session Flow
+```
+[Start Session] → RECORDING → [Pause] → PAUSED → [Resume] → RECORDING
+                      │                     │
+                      └──── [End Session] ──┘
+                                  │
+                                  ▼
+                      ┌─────────────────────┐
+                      │ Enter project name  │
+                      │ Confirm upload      │
+                      └─────────────────────┘
+                                  │
+                                  ▼
+                      ┌─────────────────────┐
+                      │ Upload & Processing │
+                      └─────────────────────┘
+```
+
+#### Key Behaviors
+- **No upfront project name** — session starts immediately
+- **Project name entered at end** — before upload begins
+- **Pause = no photos** — must resume to capture
+- **GPS captured per photo** — standard device GPS
+
+### 6.2 Post-Session Processing
 
 | Feature | Description |
 |---------|-------------|
@@ -101,7 +162,7 @@ For the prototype, the "agent" is Claude with ESA context + access to the photo 
 | **Timestamp correlation** | Link transcript segments to photos based on capture time |
 | **Structured output** | Graph-ready JSON with all nodes and relationships |
 
-### 5.3 Review Interface
+### 6.3 Review Interface
 
 | Feature | Description |
 |---------|-------------|
@@ -110,19 +171,21 @@ For the prototype, the "agent" is Claude with ESA context + access to the photo 
 | **Session summary** | List of extracted RECs, site features, observations |
 | **Export** | Download structured JSON |
 
-### 5.4 On-Device Computer Vision (Demo Feature)
+### 6.4 On-Device Computer Vision (Demo Feature)
 
-Simple, clever CV demo during capture. Options (TBD):
+Lightweight CV running during capture to demonstrate smart detection.
 
-- Object detection: storm drains, tanks, drums, signage
-- OCR: read placards, labels, permit numbers
-- Scene classification: industrial, commercial, residential
+**Prototype scope:**
+- **Object:** Drainage grate
+- **Detection type:** Presence only (no bounding box or localization)
+- **Behavior:** When detected, tag is auto-added to the photo
+- **Future:** Additional objects (ASTs, drums, signage, etc.)
 
-Implementation: Core ML model or lightweight JS-based detection.
+Implementation: Core ML model or TensorFlow.js for Safari.
 
 ---
 
-## 6. Out of Scope (Future)
+## 7. Out of Scope (Future)
 
 - Integration with Compass: Engine / Neo4j
 - VPS / Visual SLAM for precise positioning
@@ -135,23 +198,25 @@ Implementation: Core ML model or lightweight JS-based detection.
 
 ---
 
-## 7. Technical Approach
+## 8. Technical Approach
 
-### 7.1 Stack
+### 8.1 Stack
 
 | Layer | Technology |
 |-------|------------|
-| **Frontend** | HTML/CSS/JS, mobile-optimized PWA |
-| **Platform** | Safari on iOS only |
+| **Framework** | Next.js (React) |
+| **Styling** | Tailwind CSS |
+| **Hosting** | Vercel (serverless functions for API routes) |
+| **Platform** | Safari on iOS only (mobile-optimized PWA) |
 | **Camera/Audio** | MediaDevices API (getUserMedia) |
 | **GPS** | Geolocation API |
 | **Local Storage** | IndexedDB for session data |
 | **Transcription** | Whisper API (OpenAI) |
 | **AI Processing** | Claude API (transcript analysis, vision) |
-| **On-device CV** | Core ML via Safari / TensorFlow.js (TBD) |
+| **On-device CV** | TensorFlow.js or server-side Claude Vision (TBD) |
 | **Output** | JSON (graph-ready structure) |
 
-### 7.2 Data Model (Simplified)
+### 8.2 Data Model (Simplified)
 
 ```json
 {
@@ -190,7 +255,7 @@ Implementation: Core ML model or lightweight JS-based detection.
 }
 ```
 
-### 7.3 Processing Flow
+### 8.3 Processing Flow
 
 ```
 [Capture Session]
@@ -228,7 +293,7 @@ Implementation: Core ML model or lightweight JS-based detection.
 
 ---
 
-## 8. Success Criteria (Prototype)
+## 9. Success Criteria (Prototype)
 
 1. **Capture works smoothly:** User can record audio, take photos, and see GPS attached—no crashes, no lost data
 2. **Post-processing produces structured output:** Transcript, VLM descriptions, extracted entities all present in JSON
@@ -238,17 +303,17 @@ Implementation: Core ML model or lightweight JS-based detection.
 
 ---
 
-## 9. Open Questions
+## 10. Open Questions
 
-- [ ] Which object should on-device CV detect for the demo?
+- [x] ~~Which object should on-device CV detect?~~ → **Drainage grate** (presence only, more objects later)
 - [ ] Whisper API vs. alternative transcription service?
-- [ ] How to handle long sessions (>30 min audio)?
-- [ ] Should review interface allow editing extracted entities?
-- [ ] Branding: is this "ChoraGraph Capture" or something else?
+- [x] ~~How to handle long sessions (>30 min audio)?~~ → **Ignore for prototype**
+- [x] ~~Should review interface allow editing extracted entities?~~ → **Ignore for prototype**
+- [x] ~~Branding~~ → **ChoraGraph Capture**
 
 ---
 
-## 10. Next Steps
+## 11. Next Steps
 
 1. **Finalize PRD** — review and adjust with Bart
 2. **Set up Claude Code project** — clone repo, configure environment

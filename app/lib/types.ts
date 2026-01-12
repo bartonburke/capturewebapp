@@ -40,3 +40,90 @@ export interface AudioMetadata {
 
 export type GpsStatus = 'NOT_REQUESTED' | 'REQUESTING' | 'ACTIVE' | 'ERROR' | 'DENIED';
 export type SessionState = 'NOT_STARTED' | 'RECORDING' | 'PAUSED' | 'ENDED';
+
+// AI Processing types
+
+// Transcript types
+export interface TranscriptSegment {
+  start: number;              // Seconds from session start
+  end: number;                // Seconds from session start
+  text: string;               // Transcript text for this segment
+}
+
+export interface Transcript {
+  fullText: string;           // Full transcript of entire audio
+  segments: TranscriptSegment[];
+  language?: string;          // Detected language from Whisper
+  duration: number;           // Total audio duration in seconds
+}
+
+// Photo analysis types
+export interface PhotoAnalysis {
+  photoId: string;            // Links to PhotoMetadata.id
+  vlmDescription: string;     // Claude Vision description
+  catalogTags: string[];      // Searchable keywords for filtering/search
+  entities: PhotoEntity[];    // Photo-specific findings
+  transcriptSegment: TranscriptSegment | null;  // Matched transcript segment
+  timestamp: string;          // When photo was taken (ISO8601)
+  gps: GpsCoordinates | null; // GPS at photo time
+}
+
+// Photo-specific entity (simpler than ExtractedEntity for Phase 4)
+export interface PhotoEntity {
+  type: 'REC' | 'AOC' | 'Feature' | 'Equipment' | 'Condition';
+  description: string;
+  severity: 'high' | 'medium' | 'low' | 'info';
+  recommendation?: string;
+}
+
+// ESA entity types
+export type EntityType =
+  | 'REC'                     // Recognized Environmental Condition
+  | 'SiteFeature'             // AST, UST, drain, staining, etc.
+  | 'Structure'               // Building, loading dock, etc.
+  | 'Interview'               // Person statement
+  | 'Historical'              // Evidence of past use
+  | 'Regulatory';             // Permits, signage, placards
+
+export interface ExtractedEntity {
+  type: EntityType;
+  label: string;              // e.g., "Potential REC - surface staining"
+  confidence: number;         // 0.0 to 1.0
+  description?: string;       // Additional context
+  sourcePhotoIds: string[];   // Which photos show this entity
+  transcriptRefs: Array<{     // Where in transcript this is mentioned
+    start: number;
+    end: number;
+    text: string;
+  }>;
+}
+
+// Processing result (stored in IndexedDB)
+export interface ProcessingResult {
+  id: string;                 // UUID
+  projectId: string;          // Links to parent project
+  sessionId: string;          // Links to AudioMetadata.sessionId
+  createdAt: string;          // ISO8601
+  status: 'processing' | 'completed' | 'failed';
+  error?: string;             // Error message if failed
+
+  transcript: Transcript;
+  photoAnalyses: PhotoAnalysis[];
+  entities: ExtractedEntity[];
+}
+
+// Progress tracking for UI
+export type ProcessingStep =
+  | 'transcribing'
+  | 'analyzing_photos'
+  | 'correlating'
+  | 'extracting_entities'
+  | 'saving';
+
+export interface ProcessingProgress {
+  step: ProcessingStep;
+  progress: number;           // 0-100
+  message: string;            // e.g., "Analyzing photo 3 of 12"
+  currentItem?: number;       // For array processing
+  totalItems?: number;
+}

@@ -1,9 +1,9 @@
 // IndexedDB utilities for ChoraGraph Capture PWA
 
-import { Project, PhotoMetadata, AudioMetadata } from './types';
+import { Project, PhotoMetadata, AudioMetadata, ProcessingResult } from './types';
 
 const DB_NAME = 'choragraph-capture';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 // Initialize database
 export async function initDB(): Promise<IDBDatabase> {
@@ -35,6 +35,14 @@ export async function initDB(): Promise<IDBDatabase> {
         audioStore.createIndex('projectId', 'projectId', { unique: false });
         audioStore.createIndex('sessionId', 'sessionId', { unique: false });
         audioStore.createIndex('timestamp', 'timestamp', { unique: false });
+      }
+
+      // Create processing_results store (v3)
+      if (!db.objectStoreNames.contains('processing_results')) {
+        const resultsStore = db.createObjectStore('processing_results', { keyPath: 'id' });
+        resultsStore.createIndex('projectId', 'projectId', { unique: false });
+        resultsStore.createIndex('sessionId', 'sessionId', { unique: false });
+        resultsStore.createIndex('status', 'status', { unique: false });
       }
     };
   });
@@ -135,4 +143,80 @@ export async function getSessionAudio(sessionId: string): Promise<AudioMetadata 
     request.onsuccess = () => resolve(request.result || null);
     request.onerror = () => reject(request.error);
   });
+}
+
+// Delete operations
+export async function deleteProject(projectId: string): Promise<void> {
+  const db = await initDB();
+
+  // Delete all photos for this project
+  const photos = await getProjectPhotos(projectId);
+  for (const photo of photos) {
+    await deletePhoto(photo.id);
+  }
+
+  // Delete all audio for this project
+  const audio = await getProjectAudio(projectId);
+  for (const audioRecord of audio) {
+    await deleteAudio(audioRecord.id);
+  }
+
+  // Delete the project itself
+  const tx = db.transaction('projects', 'readwrite');
+  await tx.objectStore('projects').delete(projectId);
+}
+
+export async function deletePhoto(photoId: string): Promise<void> {
+  const db = await initDB();
+  const tx = db.transaction('photos', 'readwrite');
+  await tx.objectStore('photos').delete(photoId);
+}
+
+export async function deleteAudio(audioId: string): Promise<void> {
+  const db = await initDB();
+  const tx = db.transaction('audio', 'readwrite');
+  await tx.objectStore('audio').delete(audioId);
+}
+
+// Processing Results CRUD operations
+export async function saveProcessingResult(result: ProcessingResult): Promise<void> {
+  const db = await initDB();
+  const tx = db.transaction('processing_results', 'readwrite');
+  await tx.objectStore('processing_results').add(result);
+}
+
+export async function updateProcessingResult(result: ProcessingResult): Promise<void> {
+  const db = await initDB();
+  const tx = db.transaction('processing_results', 'readwrite');
+  await tx.objectStore('processing_results').put(result);
+}
+
+export async function getSessionProcessingResult(sessionId: string): Promise<ProcessingResult | null> {
+  const db = await initDB();
+  const tx = db.transaction('processing_results', 'readonly');
+  const index = tx.objectStore('processing_results').index('sessionId');
+
+  return new Promise((resolve, reject) => {
+    const request = index.get(sessionId);
+    request.onsuccess = () => resolve(request.result || null);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function getProjectProcessingResults(projectId: string): Promise<ProcessingResult[]> {
+  const db = await initDB();
+  const tx = db.transaction('processing_results', 'readonly');
+  const index = tx.objectStore('processing_results').index('projectId');
+
+  return new Promise((resolve, reject) => {
+    const request = index.getAll(projectId);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function deleteProcessingResult(id: string): Promise<void> {
+  const db = await initDB();
+  const tx = db.transaction('processing_results', 'readwrite');
+  await tx.objectStore('processing_results').delete(id);
 }
