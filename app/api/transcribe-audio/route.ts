@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import fs from 'fs';
 import path from 'path';
+import { execSync } from 'child_process';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -64,14 +65,9 @@ export async function POST(req: NextRequest) {
     // Convert base64 to Buffer
     const buffer = Buffer.from(base64Data, 'base64');
 
-    // Check file size (Whisper limit is 25MB)
+    // Check file size
     const fileSizeMB = buffer.length / (1024 * 1024);
-    if (fileSizeMB > 25) {
-      return NextResponse.json(
-        { error: `Audio file too large: ${fileSizeMB.toFixed(2)}MB (max 25MB)` },
-        { status: 413 }
-      );
-    }
+    console.log(`[Transcribe] Received ${fileSizeMB.toFixed(2)}MB audio file`);
 
     // Determine file extension from MIME type
     const extensionMap: Record<string, string> = {
@@ -83,22 +79,64 @@ export async function POST(req: NextRequest) {
     };
     const extension = extensionMap[mimeType] || 'webm';
 
-    // Create temporary file (Whisper API requires a file)
+    // Create temporary file
     const tempPath = path.join('/tmp', `audio-${Date.now()}.${extension}`);
     fs.writeFileSync(tempPath, buffer);
 
-    console.log(`[Transcribe] Processing ${fileSizeMB.toFixed(2)}MB audio file`);
+    let finalPath = tempPath;
+
+    // If file is too large for Whisper (>25MB), compress with ffmpeg
+    if (fileSizeMB > 24) {
+      console.log(`[Transcribe] File too large, compressing with ffmpeg...`);
+
+      const compressedPath = path.join('/tmp', `audio-${Date.now()}-compressed.mp3`);
+
+      try {
+        // Convert to MP3 with lower bitrate (64kbps is fine for speech)
+        // -ac 1 = mono, -ar 16000 = 16kHz sample rate (optimal for speech)
+        execSync(
+          `ffmpeg -i "${tempPath}" -vn -ac 1 -ar 16000 -ab 64k -f mp3 "${compressedPath}" -y`,
+          { stdio: 'pipe' }
+        );
+
+        // Check compressed size
+        const compressedStats = fs.statSync(compressedPath);
+        const compressedSizeMB = compressedStats.size / (1024 * 1024);
+        console.log(`[Transcribe] Compressed to ${compressedSizeMB.toFixed(2)}MB`);
+
+        if (compressedSizeMB > 25) {
+          // Still too large even after compression
+          fs.unlinkSync(tempPath);
+          fs.unlinkSync(compressedPath);
+          return NextResponse.json(
+            { error: `Audio too long. Compressed size: ${compressedSizeMB.toFixed(2)}MB (max 25MB). Try a shorter recording.` },
+            { status: 413 }
+          );
+        }
+
+        // Use compressed file
+        finalPath = compressedPath;
+
+      } catch (ffmpegError: any) {
+        console.error('[Transcribe] ffmpeg compression failed:', ffmpegError.message);
+        // Fall back to original file and let Whisper reject if too large
+        console.log('[Transcribe] Falling back to original file...');
+      }
+    }
+
+    console.log(`[Transcribe] Processing audio file: ${finalPath}`);
 
     // Call Whisper API
     const response = await openai.audio.transcriptions.create({
-      file: fs.createReadStream(tempPath),
+      file: fs.createReadStream(finalPath),
       model: 'whisper-1',
       response_format: 'verbose_json',
       timestamp_granularities: ['segment'],
     });
 
-    // Clean up temporary file
-    fs.unlinkSync(tempPath);
+    // Clean up temporary files
+    if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+    if (finalPath !== tempPath && fs.existsSync(finalPath)) fs.unlinkSync(finalPath);
 
     // Structure response
     const result: TranscribeResponse = {

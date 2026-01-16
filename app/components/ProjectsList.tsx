@@ -2,9 +2,17 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Project } from '../lib/types';
+import { Project, ProjectType } from '../lib/types';
 import { getAllProjects, deleteProject } from '../lib/db';
 import CreateProjectModal from './CreateProjectModal';
+
+// Project type badge configuration
+const PROJECT_TYPE_BADGES: Record<ProjectType, { bg: string; label: string }> = {
+  'phase1-esa': { bg: 'bg-green-600', label: 'Phase I ESA' },
+  'eir-eis': { bg: 'bg-blue-600', label: 'EIR/EIS' },
+  'borehole': { bg: 'bg-orange-600', label: 'Borehole' },
+  'generic': { bg: 'bg-gray-600', label: 'Site Visit' },
+};
 
 export default function ProjectsList() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -15,10 +23,14 @@ export default function ProjectsList() {
 
   const loadProjects = useCallback(async () => {
     try {
+      console.log('[ProjectsList] Loading projects...');
       const allProjects = await getAllProjects();
+      console.log('[ProjectsList] Loaded', allProjects.length, 'projects');
       setProjects(allProjects);
     } catch (error) {
-      console.error('Failed to load projects:', error);
+      console.error('[ProjectsList] Failed to load projects:', error);
+      // Show error to user
+      alert('Failed to load projects: ' + (error instanceof Error ? error.message : 'Unknown error'));
     } finally {
       setLoading(false);
     }
@@ -84,13 +96,16 @@ export default function ProjectsList() {
       {/* Header */}
       <div className="max-w-2xl mx-auto mb-8">
         <h1 className="text-3xl font-bold mb-2">ChoraGraph Capture</h1>
-        <p className="text-gray-400">Phase 1 ESA Site Assessment</p>
+        <p className="text-gray-400">Field Data Capture Platform</p>
       </div>
 
       {/* Create New Project Button */}
       <div className="max-w-2xl mx-auto mb-6">
         <button
-          onClick={() => setShowCreateModal(true)}
+          onClick={() => {
+            console.log('[ProjectsList] New Project button clicked');
+            setShowCreateModal(true);
+          }}
           className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -99,6 +114,9 @@ export default function ProjectsList() {
           New Project
         </button>
       </div>
+
+      {/* Debug: Show modal state */}
+      {showCreateModal && <div className="text-green-400 text-center">Modal should be visible</div>}
 
       {/* Projects List */}
       <div className="max-w-2xl mx-auto space-y-3">
@@ -121,7 +139,19 @@ export default function ProjectsList() {
               >
                 <div className="flex justify-between items-start mb-2">
                   <div className="flex-1 pr-12">
-                    <h3 className="font-semibold text-lg">{project.name}</h3>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-semibold text-lg">{project.name}</h3>
+                      {/* Project type badge */}
+                      <span className={`text-xs px-2 py-0.5 rounded ${PROJECT_TYPE_BADGES[project.projectType || 'phase1-esa']?.bg || 'bg-gray-600'}`}>
+                        {PROJECT_TYPE_BADGES[project.projectType || 'phase1-esa']?.label || 'Site Visit'}
+                      </span>
+                      {/* Launched badge */}
+                      {project.launchSessionId && (
+                        <span className="text-xs px-2 py-0.5 rounded bg-purple-600">
+                          Launched
+                        </span>
+                      )}
+                    </div>
                     <p className="text-sm text-gray-400">Lead: {project.lead}</p>
                   </div>
                   <div className="flex gap-4 text-right">

@@ -1,9 +1,9 @@
 // IndexedDB utilities for ChoraGraph Capture PWA
 
-import { Project, PhotoMetadata, AudioMetadata, ProcessingResult } from './types';
+import { Project, PhotoMetadata, AudioMetadata, ProcessingResult, LaunchSessionRecord } from './types';
 
 const DB_NAME = 'choragraph-capture';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 // Initialize database
 export async function initDB(): Promise<IDBDatabase> {
@@ -44,6 +44,18 @@ export async function initDB(): Promise<IDBDatabase> {
         resultsStore.createIndex('sessionId', 'sessionId', { unique: false });
         resultsStore.createIndex('status', 'status', { unique: false });
       }
+
+      // Create launch_sessions store (v4)
+      if (!db.objectStoreNames.contains('launch_sessions')) {
+        const sessionsStore = db.createObjectStore('launch_sessions', { keyPath: 'sessionId' });
+        sessionsStore.createIndex('externalProjectId', 'externalProjectId', { unique: false });
+        sessionsStore.createIndex('expiresAt', 'expiresAt', { unique: false });
+        sessionsStore.createIndex('status', 'status', { unique: false });
+      }
+
+      // Migrate existing projects to have projectType (v4)
+      // Note: This migration happens in getAllProjects/getProject to handle
+      // projects that don't have projectType set yet
     };
   });
 }
@@ -68,7 +80,8 @@ export async function getAllProjects(): Promise<Project[]> {
     request.onsuccess = () => {
       const cursor = request.result;
       if (cursor) {
-        projects.push(cursor.value);
+        // Apply migration for legacy projects without projectType
+        projects.push(migrateProject(cursor.value));
         cursor.continue();
       } else {
         resolve(projects);
@@ -84,7 +97,11 @@ export async function getProject(id: string): Promise<Project | null> {
   const request = tx.objectStore('projects').get(id);
 
   return new Promise((resolve, reject) => {
-    request.onsuccess = () => resolve(request.result || null);
+    request.onsuccess = () => {
+      const project = request.result;
+      // Apply migration for legacy projects without projectType
+      resolve(project ? migrateProject(project) : null);
+    };
     request.onerror = () => reject(request.error);
   });
 }
@@ -219,4 +236,57 @@ export async function deleteProcessingResult(id: string): Promise<void> {
   const db = await initDB();
   const tx = db.transaction('processing_results', 'readwrite');
   await tx.objectStore('processing_results').delete(id);
+}
+
+// Launch Sessions CRUD operations (v4)
+export async function saveLaunchSession(session: LaunchSessionRecord): Promise<void> {
+  const db = await initDB();
+  const tx = db.transaction('launch_sessions', 'readwrite');
+  await tx.objectStore('launch_sessions').add(session);
+}
+
+export async function getLaunchSession(sessionId: string): Promise<LaunchSessionRecord | null> {
+  const db = await initDB();
+  const tx = db.transaction('launch_sessions', 'readonly');
+  const request = tx.objectStore('launch_sessions').get(sessionId);
+
+  return new Promise((resolve, reject) => {
+    request.onsuccess = () => resolve(request.result || null);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function updateLaunchSession(session: LaunchSessionRecord): Promise<void> {
+  const db = await initDB();
+  const tx = db.transaction('launch_sessions', 'readwrite');
+  await tx.objectStore('launch_sessions').put(session);
+}
+
+export async function deleteLaunchSession(sessionId: string): Promise<void> {
+  const db = await initDB();
+  const tx = db.transaction('launch_sessions', 'readwrite');
+  await tx.objectStore('launch_sessions').delete(sessionId);
+}
+
+export async function getActiveLaunchSessions(): Promise<LaunchSessionRecord[]> {
+  const db = await initDB();
+  const tx = db.transaction('launch_sessions', 'readonly');
+  const index = tx.objectStore('launch_sessions').index('status');
+
+  return new Promise((resolve, reject) => {
+    const request = index.getAll('active');
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+// Helper to migrate legacy projects without projectType
+export function migrateProject(project: Project): Project {
+  if (!project.projectType) {
+    return {
+      ...project,
+      projectType: 'phase1-esa', // Default for existing projects
+    };
+  }
+  return project;
 }

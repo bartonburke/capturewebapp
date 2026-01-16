@@ -3,13 +3,15 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { getProject } from '@/app/lib/db';
-import { Project } from '@/app/lib/types';
+import { Project, ProjectContext } from '@/app/lib/types';
+import { getDefaultContext } from '@/app/lib/defaultContexts';
 import CaptureInterface from '@/app/components/CaptureInterface';
 
 export default function CapturePage() {
   const params = useParams();
   const router = useRouter();
   const [project, setProject] = useState<Project | null>(null);
+  const [context, setContext] = useState<ProjectContext | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -25,6 +27,10 @@ export default function CapturePage() {
         }
 
         setProject(proj);
+
+        // Get context from project (if launched) or use defaults for project type
+        const projectContext = proj.context || getDefaultContext(proj.projectType || 'phase1-esa');
+        setContext(projectContext);
       } catch (error) {
         console.error('Failed to load project:', error);
         alert('Failed to load project');
@@ -45,5 +51,5 @@ export default function CapturePage() {
     );
   }
 
-  return <CaptureInterface project={project} />;
+  return <CaptureInterface project={project} context={context || undefined} />;
 }

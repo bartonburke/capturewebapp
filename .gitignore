@@ -39,3 +39,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# evidence sessions (imported capture data)
+# Keep structure, ignore actual session data
+evidence/sessions/*
+!evidence/sessions/.gitkeep
+!evidence/.gitkeep
+
+# test export files
+site-visit-*.zip

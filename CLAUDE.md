@@ -39,6 +39,11 @@ Mobile-first PWA for capturing Phase 1 Environmental Site Assessment (ESA) data 
 - [x] Transcript display with segments, language detection, and duration
 - [x] Processing results stored in IndexedDB with persistence
 - [x] Green "Processed" badge for completed transcriptions
+- [x] **Multi-Project Support** - Project types (Phase I ESA, EIR/EIS, Borehole, Generic)
+- [x] **Launch API** - `/api/v1/capture/launch` for external session creation
+- [x] **Portable Evidence Package v2.0** - Export with vision analysis and entity extraction
+- [x] **Auto-Import to Working Directory** - Export automatically syncs to `evidence/sessions/`
+- [x] **SESSION_SUMMARY.md Generation** - Human/Claude-readable context for each session
 
 ### 🚧 Next Up (Phase 2)
 - Photo analysis with Claude Vision API
@@ -93,12 +98,18 @@ Mobile-first PWA for capturing Phase 1 Environmental Site Assessment (ESA) data 
 ```
 app/
 ├── api/
-│   └── transcribe-audio/
-│       └── route.ts             # Whisper API endpoint for audio transcription
+│   ├── transcribe-audio/
+│   │   └── route.ts             # Whisper API endpoint for audio transcription
+│   └── v1/capture/
+│       ├── launch/
+│       │   └── route.ts         # Launch API - create sessions externally
+│       └── import/
+│           └── route.ts         # Import API - receive exported packages
 ├── lib/
 │   ├── types.ts                 # TypeScript interfaces (Project, Photos, Audio, Processing types)
-│   ├── db.ts                    # IndexedDB v3 utilities (CRUD for projects/photos/audio/processing)
-│   └── export.ts                # Export utilities (zip generation, file conversion)
+│   ├── db.ts                    # IndexedDB v4 utilities (CRUD for projects/photos/audio/processing)
+│   ├── export.ts                # Export utilities (zip generation, file conversion)
+│   └── defaultContexts.ts       # Default entity schemas per project type
 ├── components/
 │   ├── CaptureInterface.tsx     # Camera/audio capture UI (~700 lines)
 │   ├── ProjectsList.tsx         # Projects home screen with delete (~190 lines)
@@ -107,9 +118,20 @@ app/
 │   └── page.tsx                 # Dynamic route for capture interface
 ├── project/[projectId]/
 │   └── page.tsx                 # Project review page with AI processing (~595 lines)
+├── session/[sessionId]/
+│   └── page.tsx                 # Handle launched sessions from external API
 ├── globals.css                  # iOS-optimized mobile styles
 ├── layout.tsx                   # Root layout with PWA meta tags
 └── page.tsx                     # Entry point (renders ProjectsList)
+
+evidence/
+└── sessions/                    # Imported field capture sessions
+    └── {sessionId}/
+        ├── index.json           # Complete metadata
+        ├── SESSION_SUMMARY.md   # Human/Claude readable summary
+        ├── session-audio.webm   # Audio file
+        ├── transcript.txt       # Plain text transcript
+        └── photos/              # Photo files
 
 public/
 ├── manifest.json                # PWA configuration
@@ -401,6 +423,80 @@ downloadBlob(zipBlob, filename);
 - PRD: Full product vision and architecture
 - TESTING.md: iOS testing setup and checklist
 - Data Model (PRD line 156-191): JSON structure for session data
+
+---
+
+## Field Session Data (Imported from Mobile Capture)
+
+### Location
+Field capture sessions are automatically imported to `evidence/sessions/{sessionId}/` when exported from the mobile PWA.
+
+### Directory Structure
+```
+evidence/sessions/{sessionId}/
+├── index.json              # Complete metadata (Portable Evidence Package v2.0)
+├── SESSION_SUMMARY.md      # Human/Claude readable summary - START HERE
+├── session-audio.webm      # Audio recording from field session
+├── transcript.txt          # Plain text transcript (if processed)
+└── photos/
+    ├── 001-interior-wall.jpg
+    ├── 002-ust-removal.jpg
+    └── ...
+```
+
+### Working with Field Sessions
+
+**To find available field sessions:**
+```bash
+ls -la evidence/sessions/
+```
+
+**To get context about a session, read the SESSION_SUMMARY.md:**
+```bash
+cat evidence/sessions/{sessionId}/SESSION_SUMMARY.md
+```
+
+**SESSION_SUMMARY.md contains:**
+- Project name, type, and capture timestamp
+- Photo count, audio duration, transcript availability
+- GPS coordinates of capture location
+- Extracted entities (Conditions, Features, AOCs)
+- Transcript excerpt
+- Photo observations with REC potential ratings
+
+### Key Fields in index.json
+- `session_id`: Unique identifier for the capture session
+- `project_type`: "phase1-esa", "eir-eis", "borehole", or "generic"
+- `photos[]`: Array with filename, GPS, timestamp, vision_analysis, tags
+- `transcript`: Full text and segments with timestamps
+- `session_summary.entities_extracted`: Count by entity type
+- `processing_stage`: "captured", "transcribed", "analyzed", or "graph_ready"
+
+### Common Tasks
+
+**Summarize a field session:**
+1. Read `evidence/sessions/{sessionId}/SESSION_SUMMARY.md`
+2. Reference specific photos in `photos/` directory
+3. Quote relevant portions of transcript from `transcript.txt`
+
+**Analyze photos for environmental concerns:**
+1. View photos in `photos/` directory
+2. Check `index.json` for existing `vision_analysis` per photo
+3. Note `rec_potential` ratings (high/medium/low/none)
+
+**Find all high-REC observations:**
+```bash
+grep -r "rec_potential.*high" evidence/sessions/*/index.json
+```
+
+**List all sessions with their project types:**
+```bash
+for dir in evidence/sessions/*/; do
+  if [ -f "$dir/index.json" ]; then
+    echo "$dir: $(jq -r '.project_type + " - " + .project_name' "$dir/index.json")"
+  fi
+done
+```
 
 ---
 

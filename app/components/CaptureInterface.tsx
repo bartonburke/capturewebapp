@@ -2,14 +2,23 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Project, SessionState, GpsStatus, GpsCoordinates, PhotoMetadata, AudioMetadata } from '../lib/types';
+import { Project, SessionState, GpsStatus, GpsCoordinates, PhotoMetadata, AudioMetadata, ProjectContext, ProjectType } from '../lib/types';
 import { savePhoto, updateProject, saveAudio, getProject } from '../lib/db';
 
 interface Props {
   project: Project;
+  context?: ProjectContext;
 }
 
-export default function CaptureInterface({ project }: Props) {
+// Project type badge configuration
+const PROJECT_TYPE_BADGES: Record<ProjectType, { bg: string; label: string }> = {
+  'phase1-esa': { bg: 'bg-green-600', label: 'Phase I ESA' },
+  'eir-eis': { bg: 'bg-blue-600', label: 'EIR/EIS' },
+  'borehole': { bg: 'bg-orange-600', label: 'Borehole' },
+  'generic': { bg: 'bg-gray-600', label: 'Site Visit' },
+};
+
+export default function CaptureInterface({ project, context }: Props) {
   const router = useRouter();
 
   const [sessionState, setSessionState] = useState<SessionState>('NOT_STARTED');
@@ -28,6 +37,10 @@ export default function CaptureInterface({ project }: Props) {
   const [audioError, setAudioError] = useState<string | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const sessionIdRef = useRef<string>(crypto.randomUUID());
+
+  // Capture prompts rotation state
+  const [currentPromptIndex, setCurrentPromptIndex] = useState(0);
+  const capturePrompts = context?.capturePrompts || [];
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -82,6 +95,17 @@ export default function CaptureInterface({ project }: Props) {
       }
     };
   }, [sessionState]);
+
+  // Capture prompts rotation (every 10 seconds during recording)
+  useEffect(() => {
+    if (sessionState !== 'RECORDING' || capturePrompts.length === 0) return;
+
+    const interval = setInterval(() => {
+      setCurrentPromptIndex(prev => (prev + 1) % capturePrompts.length);
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [sessionState, capturePrompts.length]);
 
   const initializeCamera = async () => {
     console.log('Initializing camera...');
@@ -540,7 +564,10 @@ export default function CaptureInterface({ project }: Props) {
           <div className="w-full h-full flex items-center justify-center bg-gray-900">
             <div className="text-center text-white px-6">
               <h1 className="text-2xl font-semibold mb-4">ChoraGraph Capture</h1>
-              <p className="text-gray-400 mb-2">Phase 1 ESA Site Assessment</p>
+              {/* Dynamic project type badge */}
+              <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium mb-2 ${PROJECT_TYPE_BADGES[project.projectType || 'phase1-esa']?.bg || 'bg-gray-600'}`}>
+                {PROJECT_TYPE_BADGES[project.projectType || 'phase1-esa']?.label || 'Site Visit'}
+              </span>
               {error && <p className="text-red-400 text-sm mt-4">{error}</p>}
               {(sessionState === 'RECORDING' || sessionState === 'PAUSED') && !stream && (
                 <p className="text-yellow-400 text-sm mt-4">Initializing camera...</p>
@@ -629,6 +656,18 @@ export default function CaptureInterface({ project }: Props) {
           <div className="mt-2 flex items-center gap-2 text-xs">
             <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
             <span className="text-white/80">Recording audio</span>
+          </div>
+        )}
+
+        {/* Rotating Capture Prompts */}
+        {sessionState === 'RECORDING' && capturePrompts.length > 0 && (
+          <div className="mt-3 bg-black/60 rounded-lg p-3 border border-yellow-500/30">
+            <div className="flex items-start gap-2 text-yellow-400 text-sm">
+              <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z" />
+              </svg>
+              <span>{capturePrompts[currentPromptIndex]}</span>
+            </div>
           </div>
         )}
       </div>

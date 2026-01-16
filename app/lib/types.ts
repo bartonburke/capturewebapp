@@ -9,6 +9,13 @@ export interface Project {
   modifiedAt: string;      // ISO8601
   photoCount: number;      // Total photos
   audioCount: number;      // Total audio recordings
+
+  // Multi-project platform support fields
+  projectType: ProjectType;           // Default: 'phase1-esa' for migration
+  externalProjectId?: string;         // ID from launching system (Claude Code)
+  launchSessionId?: string;           // Session ID if launched via API
+  context?: ProjectContext;           // Dynamic context from launch
+  processingStage?: ProcessingStage;  // Current state in processing pipeline
 }
 
 export interface GpsCoordinates {
@@ -40,6 +47,59 @@ export interface AudioMetadata {
 
 export type GpsStatus = 'NOT_REQUESTED' | 'REQUESTING' | 'ACTIVE' | 'ERROR' | 'DENIED';
 export type SessionState = 'NOT_STARTED' | 'RECORDING' | 'PAUSED' | 'ENDED';
+
+// Multi-project platform support types
+export type ProjectType = 'phase1-esa' | 'eir-eis' | 'borehole' | 'generic';
+export type ProcessingStage = 'captured' | 'transcribed' | 'analyzed' | 'graph_ready';
+
+// Entity schema for dynamic configuration per project type
+export interface EntitySchemaItem {
+  name: string;                    // e.g., "REC", "UST"
+  displayName: string;             // e.g., "Recognized Environmental Condition"
+  description?: string;            // For UI tooltips
+  extractionKeywords?: string[];   // Keywords for Claude Vision prompts
+  confidenceThreshold?: number;    // 0.0-1.0
+}
+
+// Project context passed at launch or configured locally
+export interface ProjectContext {
+  projectType: ProjectType;
+  entitySchema: EntitySchemaItem[];
+  capturePrompts: string[];        // Rotating tips during capture
+  visionAnalysisPrompt?: string;   // Custom Claude Vision prompt
+}
+
+// Launch API request/response types
+export interface LaunchSessionRequest {
+  projectId?: string;              // External project ID (from Claude Code)
+  projectType: ProjectType;
+  projectName: string;
+  lead?: string;
+  notes?: string;
+  context?: Partial<ProjectContext>;
+  expiresAt?: string;              // ISO8601 - defaults to 24 hours
+}
+
+export interface LaunchSessionResponse {
+  sessionId: string;               // UUID for capture session
+  captureUrl: string;              // Full URL to open on mobile
+  expiresAt: string;               // ISO8601
+}
+
+// Launch session record (stored in IndexedDB)
+export interface LaunchSessionRecord {
+  sessionId: string;               // Primary key
+  externalProjectId?: string;      // From launching system
+  projectType: ProjectType;
+  projectName: string;
+  lead?: string;
+  notes?: string;
+  context: ProjectContext;
+  createdAt: string;               // ISO8601
+  expiresAt: string;               // ISO8601
+  status: 'pending' | 'active' | 'completed' | 'expired';
+  localProjectId?: string;         // Links to local Project after activation
+}
 
 // AI Processing types
 

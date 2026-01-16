@@ -1,0 +1,8 @@
+# Session data directory
+# Imported field capture sessions are stored here as:
+# evidence/sessions/{sessionId}/
+#   ├── index.json              # Complete metadata
+#   ├── SESSION_SUMMARY.md      # Human/CC readable summary
+#   ├── session-audio.webm      # Audio file
+#   ├── transcript.txt          # Plain text transcript
+#   └── photos/                 # Photo files

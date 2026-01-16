@@ -3,8 +3,8 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Project, PhotoMetadata, AudioMetadata, ProcessingResult, ProcessingProgress, PhotoAnalysis } from '../../lib/types';
-import { getProject, getProjectPhotos, getProjectAudio, deletePhoto, deleteAudio, updateProject, getSessionProcessingResult, saveProcessingResult } from '../../lib/db';
-import { exportProject, downloadBlob, generateExportFilename } from '../../lib/export';
+import { getProject, getProjectPhotos, getProjectAudio, deletePhoto, deleteAudio, updateProject, getSessionProcessingResult, saveProcessingResult, deleteProject, deleteLaunchSession } from '../../lib/db';
+import { exportProject, downloadBlob, generateExportFilename, exportPortableEvidencePackage, generatePortableFilename } from '../../lib/export';
 
 export default function ProjectDetailsPage() {
   const params = useParams();
@@ -19,6 +19,8 @@ export default function ProjectDetailsPage() {
   const [confirmDeletePhoto, setConfirmDeletePhoto] = useState<string | null>(null);
   const [confirmDeleteAudio, setConfirmDeleteAudio] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [showExportDeleteConfirm, setShowExportDeleteConfirm] = useState(false);
+  const [exportedFilename, setExportedFilename] = useState<string | null>(null);
   const [processingSessionId, setProcessingSessionId] = useState<string | null>(null);
   const [processingProgress, setProcessingProgress] = useState<ProcessingProgress | null>(null);
   const [processingResults, setProcessingResults] = useState<Map<string, ProcessingResult>>(new Map());
@@ -202,6 +204,84 @@ export default function ProjectDetailsPage() {
       alert('Failed to export project. Please try again.');
     } finally {
       setIsExporting(false);
+    }
+  };
+
+  const handleExportAndDelete = async () => {
+    if (!project) return;
+
+    try {
+      setIsExporting(true);
+
+      // Get processing result for enhanced export if available
+      const result = audio.length > 0
+        ? await getSessionProcessingResult(audio[0].sessionId)
+        : null;
+
+      // Generate portable evidence package
+      const zipBlob = await exportPortableEvidencePackage(project, photos, audio, result || undefined);
+      const filename = generatePortableFilename(project.name);
+
+      // Auto-upload to import API (sync to Claude Code working directory)
+      const sessionId = project.launchSessionId || project.id;
+      try {
+        const formData = new FormData();
+        formData.append('file', zipBlob, filename);
+        formData.append('sessionId', sessionId);
+
+        console.log('[Export] Auto-uploading to import API...');
+        const importResponse = await fetch('/api/v1/capture/import', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (importResponse.ok) {
+          const importResult = await importResponse.json();
+          console.log('[Export] Auto-imported to:', importResult.outputPath);
+        } else {
+          const errorData = await importResponse.json();
+          console.warn('[Export] Auto-import failed:', errorData.error);
+        }
+      } catch (importError) {
+        // Don't fail the export if import fails - just log it
+        console.warn('[Export] Auto-import error (continuing with download):', importError);
+      }
+
+      // Always download locally as backup
+      downloadBlob(zipBlob, filename);
+
+      // Track for confirmation
+      setExportedFilename(filename);
+      setShowExportDeleteConfirm(true);
+
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert('Export failed. Data not deleted.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const confirmDeleteAfterExport = async () => {
+    if (!project) return;
+
+    try {
+      await deleteProject(project.id);
+
+      // Also delete launch session record if exists
+      if (project.launchSessionId) {
+        try {
+          await deleteLaunchSession(project.launchSessionId);
+        } catch (e) {
+          // Ignore if launch session doesn't exist
+          console.log('No launch session to delete');
+        }
+      }
+
+      router.push('/');
+    } catch (error) {
+      console.error('Delete failed:', error);
+      alert('Failed to delete project.');
     }
   };
 
@@ -408,25 +488,31 @@ export default function ProjectDetailsPage() {
               <button
                 onClick={handleExportProject}
                 disabled={isExporting}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:opacity-50 text-white font-semibold rounded-lg transition-colors flex-shrink-0 flex items-center gap-2"
+                className="px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:opacity-50 text-white font-semibold rounded-lg transition-colors flex-shrink-0 flex items-center gap-1"
                 aria-label="Export project"
+                title="Export project (keep data)"
               >
                 {isExporting ? (
-                  <>
-                    <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <span className="hidden sm:inline">Exporting...</span>
-                  </>
+                  <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
                 ) : (
-                  <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                    <span className="hidden sm:inline">Export</span>
-                  </>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
                 )}
+              </button>
+              <button
+                onClick={handleExportAndDelete}
+                disabled={isExporting}
+                className="px-3 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-800 disabled:opacity-50 text-white font-semibold rounded-lg transition-colors flex-shrink-0 flex items-center gap-1"
+                aria-label="Export and delete project"
+                title="Export project and delete from device"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
               </button>
               <button
                 onClick={() => router.push(`/capture/${projectId}`)}
@@ -843,6 +929,36 @@ export default function ProjectDetailsPage() {
               </button>
               <button
                 onClick={() => handleDeleteAudio(confirmDeleteAudio)}
+                className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Export & Delete Confirmation Dialog */}
+      {showExportDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4">
+          <div className="bg-gray-800 rounded-lg p-6 max-w-sm w-full border border-gray-700">
+            <h3 className="text-white font-semibold text-lg mb-3">Export Complete</h3>
+            <p className="text-gray-300 text-sm mb-2">
+              Your evidence package has been exported as:
+            </p>
+            <p className="text-blue-400 text-sm font-mono mb-4 break-all">{exportedFilename}</p>
+            <p className="text-yellow-400 text-sm mb-6">
+              Do you want to delete this project from your device? This cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowExportDeleteConfirm(false)}
+                className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+              >
+                Keep Project
+              </button>
+              <button
+                onClick={confirmDeleteAfterExport}
                 className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors"
               >
                 Delete
