@@ -16,10 +16,14 @@ export async function POST(req: NextRequest) {
       request: req,
       token,
       onBeforeGenerateToken: async (pathname) => {
-        // Validate it's an audio file and set size limits
+        // Validate it's an audio/video file and set size limits
+        // Note: MediaRecorder on iOS may produce video/webm even for audio-only streams
         return {
-          allowedContentTypes: ['audio/webm', 'audio/mp4', 'audio/mpeg', 'audio/wav', 'audio/m4a'],
-          maximumSizeInBytes: 100 * 1024 * 1024, // 100MB max (well under Whisper's 25MB limit, but allows for overhead)
+          allowedContentTypes: [
+            'audio/webm', 'audio/mp4', 'audio/mpeg', 'audio/wav', 'audio/m4a',
+            'video/webm', 'video/mp4'  // iOS MediaRecorder sometimes reports video MIME type
+          ],
+          maximumSizeInBytes: 100 * 1024 * 1024, // 100MB max
         };
       },
       onUploadCompleted: async ({ blob }) => {
