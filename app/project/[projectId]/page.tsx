@@ -19,6 +19,7 @@ export default function ProjectDetailsPage() {
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const [confirmDeletePhoto, setConfirmDeletePhoto] = useState<string | null>(null);
   const [confirmDeleteAudio, setConfirmDeleteAudio] = useState<string | null>(null);
+  const [confirmDeleteProject, setConfirmDeleteProject] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [showExportDeleteConfirm, setShowExportDeleteConfirm] = useState(false);
   const [exportedFilename, setExportedFilename] = useState<string | null>(null);
@@ -379,6 +380,28 @@ export default function ProjectDetailsPage() {
     }
   };
 
+  const handleDeleteProject = async () => {
+    if (!project) return;
+
+    try {
+      await deleteProject(project.id);
+
+      // If this was a launched session, also delete the launch record
+      if (project.launchSessionId) {
+        try {
+          await deleteLaunchSession(project.launchSessionId);
+        } catch (e) {
+          console.log('No launch session to delete or already deleted');
+        }
+      }
+
+      router.push('/');
+    } catch (error) {
+      console.error('Failed to delete project:', error);
+      alert('Failed to delete project. Please try again.');
+    }
+  };
+
   const handleExportAndDelete = async () => {
     if (!project) return;
 
@@ -502,23 +525,14 @@ export default function ProjectDetailsPage() {
             </div>
             <div className="flex gap-2">
               <button
-                onClick={handleExportAndDelete}
-                disabled={isExporting}
-                className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-800 disabled:opacity-50 text-white font-semibold rounded-lg transition-colors flex-shrink-0 flex items-center gap-2"
-                aria-label="Export package for ChoraGraph Map"
-                title="Export package for ChoraGraph Map"
+                onClick={() => setConfirmDeleteProject(true)}
+                className="p-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl transition-colors flex-shrink-0"
+                aria-label="Delete project"
+                title="Delete project"
               >
-                {isExporting ? (
-                  <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                ) : (
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                )}
-                <span className="text-sm">Export Package</span>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
               </button>
               <button
                 onClick={() => router.push(`/capture/${projectId}`)}
@@ -910,6 +924,35 @@ export default function ProjectDetailsPage() {
                 className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors"
               >
                 Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Project Confirmation Dialog */}
+      {confirmDeleteProject && (
+        <div className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4">
+          <div className="bg-gray-800 rounded-xl p-6 max-w-sm w-full border border-gray-700">
+            <h3 className="text-white font-semibold text-lg mb-3">Delete Project?</h3>
+            <p className="text-gray-300 text-sm mb-2">
+              This will permanently delete <span className="font-semibold text-white">{project?.name}</span> and all associated photos and audio recordings.
+            </p>
+            <p className="text-red-400 text-sm font-semibold mb-6">
+              This action cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmDeleteProject(false)}
+                className="flex-1 px-4 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-xl transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteProject}
+                className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl transition-colors"
+              >
+                Delete Project
               </button>
             </div>
           </div>
