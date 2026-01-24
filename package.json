@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
+    "@vercel/blob": "^2.0.1",
     "adm-zip": "^0.5.16",
     "jszip": "^3.10.1",
     "next": "16.1.1",

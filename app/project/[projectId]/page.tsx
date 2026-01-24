@@ -97,6 +97,19 @@ export default function ProjectDetailsPage() {
     checkExistingResults();
   }, [audio]);
 
+  // Helper to convert data URL to Blob for upload
+  const dataURLtoBlob = (dataURL: string): Blob => {
+    const [header, base64] = dataURL.split(',');
+    const mimeMatch = header.match(/:(.*?);/);
+    const mime = mimeMatch ? mimeMatch[1] : 'audio/webm';
+    const binary = atob(base64);
+    const array = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      array[i] = binary.charCodeAt(i);
+    }
+    return new Blob([array], { type: mime });
+  };
+
   // Batch process session: transcribe audio + analyze all photos
   const handleProcessSession = async () => {
     if (!project || audio.length === 0) return;
@@ -109,7 +122,43 @@ export default function ProjectDetailsPage() {
     const audioItem = audio[0];
 
     try {
-      // Step 1: Transcribe audio
+      // Step 1: Handle audio - upload to blob if large, or send directly
+      const fileSizeMB = audioItem.fileSize / (1024 * 1024);
+      console.log(`[ProcessSession] Audio size: ${fileSizeMB.toFixed(2)}MB`);
+
+      let audioUrl: string | undefined;
+      let audioData: string | undefined;
+
+      if (fileSizeMB > 4) {
+        // Large file - upload to Vercel Blob first
+        console.log('[ProcessSession] Large file detected, uploading to blob storage...');
+        setProcessingProgress({ step: 'uploading', progress: 5, message: 'Uploading audio...' });
+
+        try {
+          const { upload } = await import('@vercel/blob/client');
+          const audioBlob = dataURLtoBlob(audioItem.audioData);
+
+          const result = await upload(
+            `audio-${audioItem.sessionId}.webm`,
+            audioBlob,
+            {
+              access: 'public',
+              handleUploadUrl: '/api/upload-audio',
+            }
+          );
+
+          audioUrl = result.url;
+          console.log('[ProcessSession] Audio uploaded to:', audioUrl);
+        } catch (uploadError: any) {
+          console.error('[ProcessSession] Blob upload failed:', uploadError);
+          throw new Error(`Failed to upload large audio file: ${uploadError.message}`);
+        }
+      } else {
+        // Small file - send directly as base64
+        audioData = audioItem.audioData;
+      }
+
+      // Step 2: Transcribe audio
       console.log('[ProcessSession] Starting transcription...');
       setProcessingProgress({ step: 'transcribing', progress: 10, message: 'Transcribing audio...' });
 
@@ -117,7 +166,8 @@ export default function ProjectDetailsPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          audioData: audioItem.audioData,
+          audioUrl,
+          audioData,
           mimeType: audioItem.mimeType
         })
       });
@@ -764,6 +814,11 @@ export default function ProjectDetailsPage() {
 
             {/* Step indicators */}
             <div className="space-y-2 text-sm">
+              {processingProgress.step === 'uploading' && (
+                <div className="flex items-center gap-2 text-purple-400">
+                  ○ Uploading audio (large file)
+                </div>
+              )}
               <div className={`flex items-center gap-2 ${processingProgress.step === 'transcribing' ? 'text-purple-400' : processingProgress.progress > 30 ? 'text-green-400' : 'text-gray-500'}`}>
                 {processingProgress.progress > 30 ? '✓' : processingProgress.step === 'transcribing' ? '○' : '○'} Transcribing audio
               </div>

@@ -1,6 +1,7 @@
 // API Route: Transcribe Audio with OpenAI Whisper
-// Receives base64 audio, converts to file, transcribes, returns structured transcript
+// Receives base64 audio OR blob URL, converts to file, transcribes, returns structured transcript
 // Works in Vercel serverless environment using toFile helper (no filesystem access needed)
+// For large files (>4MB), use audioUrl from Vercel Blob storage to bypass body size limits
 
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI, { toFile } from 'openai';
@@ -10,9 +11,10 @@ const openai = new OpenAI({
 });
 
 interface TranscribeRequest {
-  audioData: string;  // Base64 data URL (e.g., "data:audio/webm;base64,...")
-  mimeType: string;   // e.g., "audio/webm"
-  duration?: number;  // Optional duration in seconds for validation
+  audioData?: string;  // Base64 data URL (e.g., "data:audio/webm;base64,...") - for small files
+  audioUrl?: string;   // Vercel Blob URL - for large files (>4MB)
+  mimeType: string;    // e.g., "audio/webm"
+  duration?: number;   // Optional duration in seconds for validation
 }
 
 interface TranscriptSegment {
@@ -34,34 +36,65 @@ export async function POST(req: NextRequest) {
   try {
     // Parse request
     const body: TranscribeRequest = await req.json();
-    const { audioData, mimeType } = body;
+    const { audioData, audioUrl, mimeType } = body;
 
-    // Validate request
-    if (!audioData || !mimeType) {
+    // Validate request - need either audioData or audioUrl
+    if (!mimeType) {
       return NextResponse.json(
-        { error: 'Missing audioData or mimeType' },
+        { error: 'Missing mimeType' },
         { status: 400 }
       );
     }
 
-    if (!audioData.startsWith('data:')) {
+    if (!audioData && !audioUrl) {
       return NextResponse.json(
-        { error: 'audioData must be a data URL' },
+        { error: 'Missing audioData or audioUrl' },
         { status: 400 }
       );
     }
 
-    // Extract base64 data
-    const base64Data = audioData.split(',')[1];
-    if (!base64Data) {
+    let buffer: Buffer;
+
+    if (audioUrl) {
+      // Fetch audio from Vercel Blob storage (for large files)
+      console.log(`[Transcribe] Fetching audio from blob: ${audioUrl}`);
+      const fetchResponse = await fetch(audioUrl);
+
+      if (!fetchResponse.ok) {
+        return NextResponse.json(
+          { error: `Failed to fetch audio from blob storage: ${fetchResponse.status}` },
+          { status: 500 }
+        );
+      }
+
+      buffer = Buffer.from(await fetchResponse.arrayBuffer());
+      console.log(`[Transcribe] Fetched ${(buffer.length / (1024 * 1024)).toFixed(2)}MB from blob`);
+    } else if (audioData) {
+      // Use base64 data directly (for small files)
+      if (!audioData.startsWith('data:')) {
+        return NextResponse.json(
+          { error: 'audioData must be a data URL' },
+          { status: 400 }
+        );
+      }
+
+      // Extract base64 data
+      const base64Data = audioData.split(',')[1];
+      if (!base64Data) {
+        return NextResponse.json(
+          { error: 'Invalid data URL format' },
+          { status: 400 }
+        );
+      }
+
+      // Convert base64 to Buffer
+      buffer = Buffer.from(base64Data, 'base64');
+    } else {
       return NextResponse.json(
-        { error: 'Invalid data URL format' },
+        { error: 'No audio data provided' },
         { status: 400 }
       );
     }
-
-    // Convert base64 to Buffer
-    const buffer = Buffer.from(base64Data, 'base64');
 
     // Check file size
     const fileSizeMB = buffer.length / (1024 * 1024);
@@ -149,4 +182,4 @@ export async function POST(req: NextRequest) {
 
 // Next.js App Router configuration for large request bodies
 // Note: Vercel has a 4.5MB limit on serverless functions by default
-// For larger files, consider using Vercel Blob storage or chunking
+// For larger files (>4MB), use audioUrl with Vercel Blob storage

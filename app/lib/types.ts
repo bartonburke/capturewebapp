@@ -187,6 +187,7 @@ export interface ProcessingResult {
 
 // Progress tracking for UI
 export type ProcessingStep =
+  | 'uploading'
   | 'transcribing'
   | 'analyzing_photos'
   | 'correlating'

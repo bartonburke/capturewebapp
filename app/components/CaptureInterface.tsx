@@ -11,6 +11,11 @@ interface Props {
   context?: ProjectContext;
 }
 
+// Session length limits to prevent exceeding Vercel Blob 500MB limit
+// At ~64kbps WebM Opus, 4 hours = ~115MB (well under limit)
+const MAX_SESSION_DURATION_SECONDS = 4 * 60 * 60; // 4 hours
+const WARNING_BEFORE_END_SECONDS = 5 * 60; // Warn 5 minutes before
+
 // Project type badge configuration
 const PROJECT_TYPE_BADGES: Record<ProjectType, { bg: string; label: string }> = {
   'phase1-esa': { bg: 'bg-green-600', label: 'Phase I ESA' },
@@ -51,6 +56,9 @@ export default function CaptureInterface({ project, context }: Props) {
   // Thumbnail picker state
   const [showThumbnailPicker, setShowThumbnailPicker] = useState(false);
   const [sessionPhotos, setSessionPhotos] = useState<PhotoMetadata[]>([]);
+
+  // Session length limit warning
+  const [showSessionWarning, setShowSessionWarning] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -116,6 +124,26 @@ export default function CaptureInterface({ project, context }: Props) {
 
     return () => clearInterval(interval);
   }, [sessionState, capturePrompts.length]);
+
+  // Session length limit monitoring
+  useEffect(() => {
+    if (sessionState !== 'RECORDING') {
+      setShowSessionWarning(false);
+      return;
+    }
+
+    // Show warning 5 minutes before limit
+    const warningTime = MAX_SESSION_DURATION_SECONDS - WARNING_BEFORE_END_SECONDS;
+    if (duration >= warningTime && duration < MAX_SESSION_DURATION_SECONDS) {
+      setShowSessionWarning(true);
+    }
+
+    // Auto-end at limit
+    if (duration >= MAX_SESSION_DURATION_SECONDS) {
+      console.log('[Session] Maximum duration reached, auto-ending session');
+      handleEndSession();
+    }
+  }, [duration, sessionState]);
 
   const initializeCamera = async () => {
     console.log('Initializing camera...');
@@ -876,6 +904,19 @@ export default function CaptureInterface({ project, context }: Props) {
           <div className="mt-2 flex items-center gap-2 text-xs">
             <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
             <span className="text-white/80">Recording audio</span>
+          </div>
+        )}
+
+        {/* Session Length Warning */}
+        {showSessionWarning && (
+          <div className="mt-2 bg-yellow-600 text-white p-3 rounded-lg">
+            <div className="flex items-center gap-2">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <span className="font-medium">Session ending in {Math.ceil((MAX_SESSION_DURATION_SECONDS - duration) / 60)} minutes</span>
+            </div>
+            <p className="text-sm mt-1 opacity-90">Maximum session length reached. End session to save your work.</p>
           </div>
         )}
 
