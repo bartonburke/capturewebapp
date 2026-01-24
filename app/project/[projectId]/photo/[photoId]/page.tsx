@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { PhotoMetadata, ProcessingResult, PhotoAnalysis } from '@/app/lib/types';
-import { getProjectPhotos, getProjectAudio } from '@/app/lib/db';
+import { PhotoMetadata, ProcessingResult, PhotoAnalysis, Project } from '@/app/lib/types';
+import { getProject, getProjectPhotos, getProjectAudio } from '@/app/lib/db';
 import { formatDuration } from '@/app/lib/correlation';
 
 export default function PhotoDetailPage() {
@@ -13,6 +13,7 @@ export default function PhotoDetailPage() {
   const projectId = params.projectId as string;
 
   const [photo, setPhoto] = useState<PhotoMetadata | null>(null);
+  const [project, setProject] = useState<Project | null>(null);
   const [analysis, setAnalysis] = useState<PhotoAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
@@ -35,6 +36,12 @@ export default function PhotoDetailPage() {
 
   const loadPhotoData = async () => {
     try {
+      // Load project first to get projectType
+      const projectData = await getProject(projectId);
+      if (projectData) {
+        setProject(projectData);
+      }
+
       // Get all photos for this project to find the one we want
       const photos = await getProjectPhotos(projectId);
       const currentPhoto = photos.find(p => p.id === photoId);
@@ -113,6 +120,7 @@ export default function PhotoDetailPage() {
           gps: photo.gps,
           timestamp: photo.timestamp,
           sessionTimestamp: photo.sessionTimestamp,
+          projectType: project?.projectType || 'phase1-esa',
           provider: 'openai',
           model: 'gpt-4o-mini'
         })

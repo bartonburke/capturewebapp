@@ -162,6 +162,7 @@ export default function ProjectDetailsPage() {
               timestamp: photo.timestamp,
               sessionTimestamp: photo.sessionTimestamp,
               transcriptSegment: matchedSegment,
+              projectType: project.projectType,
               provider: 'openai',
               model: 'gpt-4o-mini'
             })

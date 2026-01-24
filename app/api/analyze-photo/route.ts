@@ -1,19 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
-import { PhotoAnalysis, GpsCoordinates, PhotoEntity, TranscriptSegment } from '@/app/lib/types';
+import { PhotoAnalysis, GpsCoordinates, PhotoEntity, TranscriptSegment, ProjectType, EntitySchemaItem } from '@/app/lib/types';
+import { getDefaultContext } from '@/app/lib/defaultContexts';
 
 type VisionProvider = 'claude' | 'openai';
 type VisionModel = 'claude-sonnet-4-5-20250929' | 'gpt-4o-mini' | 'gpt-4o';
 
-// ESA-specific prompt for comprehensive photo analysis
-// Now includes transcript context for intelligent analysis
+// Build analysis prompt based on project type and context
+// Dynamically adapts to different project types (ESA, EIR/EIS, Borehole, Generic)
 function buildAnalysisPrompt(
+  projectType: ProjectType,
   gps: GpsCoordinates | null,
   timestamp: string,
   sessionTimestamp: number,
   transcriptContext: TranscriptSegment | null
 ): string {
+  const context = getDefaultContext(projectType);
+  const basePrompt = context.visionAnalysisPrompt;
+  const entitySchema = context.entitySchema;
+
   const gpsText = gps
     ? `[GPS coordinates: ${gps.latitude.toFixed(6)}, ${gps.longitude.toFixed(6)} ±${Math.round(gps.accuracy)}m]`
     : '[GPS coordinates: Not available]';
@@ -30,26 +36,79 @@ The field consultant said the following while taking this photo:
 1. **Answer questions**: If the consultant asks "What is this?" or "I wonder if...", try to answer based on what you see
 2. **Extract action items**: If they say "add to to-do" or "need to check later", create an ActionItem entity
 3. **Note their observations**: If they share context like "the site manager said..." or "this used to be...", incorporate it
-4. **Validate hypotheses**: If they say "this looks like a UST" or "might be contamination", confirm or challenge based on visual evidence
+4. **Validate hypotheses**: If they mention what something might be, confirm or challenge based on visual evidence
 5. **Flag uncertainties**: If they express uncertainty, note it and provide your assessment
 `;
   }
 
-  return `You are assisting a Phase I Environmental Site Assessment (ESA) per ASTM E1527-21 standard.
+  // Build entity types list from schema
+  const entityTypes = entitySchema.map(e => e.name).join(' | ');
+  const entityDescriptions = entitySchema.map(e => `     - "${e.name}" - ${e.displayName}: ${e.description || ''}`).join('\n');
 
-Your role: Analyze site photographs to identify environmental conditions, potential contamination sources, and regulatory compliance issues. Focus on features that could indicate current or historical environmental impacts.
+  // Build catalog tags based on project type
+  const catalogTagsSection = buildCatalogTags(projectType, transcriptContext !== null);
+
+  return `${basePrompt}
 ${transcriptSection}
 Analyze this photograph and provide:
 
 1. VISUAL DESCRIPTION (2-4 sentences)
    - Describe what is visible in the photo with specificity
-   - Note relevant environmental observations (staining, deterioration, storage practices)
-   - Identify any potential Recognized Environmental Conditions (RECs) or Areas of Concern (AOCs)
-   - Include context from GPS if provided (e.g., "exterior northeast corner" vs "interior space")
+   - Note relevant observations for this type of assessment
+   - Include context from GPS if provided
    ${transcriptContext ? '- Address any questions or observations from the consultant\'s verbal context' : ''}
 
 2. CATALOG TAGS (searchable keywords - comprehensive list)
-   Include ALL relevant tags from these categories:
+${catalogTagsSection}
+   ${transcriptContext ? '\n   **Transcript-derived:** action_item, question_raised, consultant_observation, needs_verification' : ''}
+
+3. EXTRACTED ENTITIES (structured findings - be comprehensive)
+   For each significant observation, create an entity with:
+   - type: One of:
+${entityDescriptions}
+     ${transcriptContext ? `- "ActionItem" - Something the consultant wants to follow up on
+     - "Question" - A question the consultant asked (include your answer)
+     - "Observation" - Consultant's verbal observation worth noting` : ''}
+   - description: Detailed description with measurements/specifics when possible
+   - severity: "high" | "medium" | "low" | "info"
+   - recommendation: Follow-up action if applicable
+
+   **Severity Guidelines:**
+   - high: Critical finding requiring immediate attention or investigation
+   - medium: Notable finding warranting follow-up
+   - low: Minor observation for documentation
+   - info: General feature documentation
+
+${gpsText}
+[Photo timestamp: ${timestamp}]
+[Session duration: ${Math.round(sessionTimestamp)} seconds]
+[Project type: ${projectType}]
+
+Respond ONLY with valid JSON in this exact structure:
+{
+  "description": "string",
+  "catalogTags": ["string"],
+  "entities": [
+    {
+      "type": "${entityTypes}"${transcriptContext ? ' | "ActionItem" | "Question" | "Observation"' : ''},
+      "description": "string",
+      "severity": "high" | "medium" | "low" | "info",
+      "recommendation": "string or null"${transcriptContext ? `,
+      "consultantContext": "string or null",
+      "aiResponse": "string or null"` : ''}
+    }
+  ]
+}`;
+}
+
+// Build catalog tags section based on project type
+function buildCatalogTags(projectType: ProjectType, hasTranscript: boolean): string {
+  const commonTags = `
+   **General:** building, structure, equipment, vegetation, ground, surface`;
+
+  switch (projectType) {
+    case 'phase1-esa':
+      return `   Include ALL relevant tags from these categories:
 
    **Surfaces & Ground:** asphalt, concrete, gravel, soil, grass, bare_soil, pavement_cracking, potholes, subsidence, erosion
 
@@ -69,59 +128,52 @@ Analyze this photograph and provide:
 
    **Signage & Safety:** hazmat_placard, nfpa_diamond, safety_signage, warning_label, no_trespassing
 
-   **Risk Flags:** potential_rec, potential_aoc, hazmat_concern, requires_sampling, compliance_issue, historical_use_indicator
-   ${transcriptContext ? '\n   **Transcript-derived:** action_item, question_raised, consultant_observation, needs_verification' : ''}
+   **Risk Flags:** potential_rec, potential_aoc, hazmat_concern, requires_sampling, compliance_issue, historical_use_indicator`;
 
-3. EXTRACTED ENTITIES (structured findings - be comprehensive)
-   For each significant observation, create an entity with:
-   - type: One of:
-     - "REC" - Recognized Environmental Condition
-     - "AOC" - Area of Concern
-     - "Feature" - Site feature
-     - "Equipment" - Equipment/machinery
-     - "Condition" - Observable condition
-     ${transcriptContext ? `- "ActionItem" - Something the consultant wants to follow up on
-     - "Question" - A question the consultant asked (include your answer)
-     - "Observation" - Consultant's verbal observation worth noting` : ''}
-   - description: Detailed description with measurements/specifics when possible
-   - severity: "high" | "medium" | "low" | "info"
-   - recommendation: Follow-up action if applicable (sampling, further investigation, etc.)
-   ${transcriptContext ? `- consultantContext: (optional) Quote what the consultant said that relates to this entity
-   - aiResponse: (optional) Your answer if responding to a question` : ''}
+    case 'eir-eis':
+      return `   Include ALL relevant tags from these categories:
 
-   **Severity Guidelines:**
-   - high: Confirmed or highly likely REC (active leaking, extensive staining, hazmat storage issues)
-   - medium: Potential AOC requiring investigation (minor staining, suspect features, unclear conditions)
-   - low: Minor observation warranting documentation (aging equipment, cosmetic deterioration)
-   - info: General site feature documentation (storm drains, building features, utilities)
+   **Landscape & Terrain:** hillside, valley, ridgeline, slope, flat, drainage, watershed, viewshed
 
-CRITICAL: Be thorough and comprehensive. Tag everything visible that could be relevant for:
-- Environmental compliance
-- Historical site use inference
-- Potential contamination sources
-- Future investigation needs
-- Report completeness
-${transcriptContext ? '- Consultant questions and to-do items' : ''}
+   **Vegetation:** native_plants, invasive_species, trees, shrubs, grassland, wetland_vegetation, riparian
 
-${gpsText}
-[Photo timestamp: ${timestamp}]
-[Session duration: ${Math.round(sessionTimestamp)} seconds]
+   **Wildlife:** bird, mammal, reptile, amphibian, nest, burrow, tracks, habitat, migration_corridor
 
-Respond ONLY with valid JSON in this exact structure:
-{
-  "description": "string",
-  "catalogTags": ["string"],
-  "entities": [
-    {
-      "type": "REC" | "AOC" | "Feature" | "Equipment" | "Condition"${transcriptContext ? ' | "ActionItem" | "Question" | "Observation"' : ''},
-      "description": "string",
-      "severity": "high" | "medium" | "low" | "info",
-      "recommendation": "string or null"${transcriptContext ? `,
-      "consultantContext": "string or null",
-      "aiResponse": "string or null"` : ''}
-    }
-  ]
-}`;
+   **Water Features:** stream, creek, pond, lake, wetland, vernal_pool, drainage_channel, flood_zone
+
+   **Human Elements:** residence, school, hospital, park, trail, road, utility, fence, signage
+
+   **Environmental Sensitivity:** sensitive_habitat, protected_species, cultural_resource, archaeological, scenic_resource
+
+   **Impact Indicators:** erosion, sedimentation, disturbance, construction_activity, grading, clearing`;
+
+    case 'borehole':
+      return `   Include ALL relevant tags from these categories:
+
+   **Equipment:** drill_rig, auger, core_barrel, sample_tube, tripod, pump, generator, water_tank
+
+   **Soil & Geology:** clay, silt, sand, gravel, bedrock, fill, topsoil, weathered_rock, groundwater
+
+   **Samples:** soil_sample, core_sample, water_sample, split_spoon, shelby_tube, jar_sample
+
+   **Conditions:** wet, dry, saturated, moist, odor, staining, sheen, discoloration
+
+   **Safety:** hard_hat, safety_vest, barrier, caution_tape, decontamination, ppe
+
+   **Documentation:** depth_marker, label, log_sheet, field_notes, measurement`;
+
+    case 'generic':
+    default:
+      return `   Include ALL relevant tags that describe:
+
+   **Location:** interior, exterior, ground_level, elevated, adjacent_property
+
+   **Features:** structure, equipment, vegetation, surface, utility, signage
+
+   **Conditions:** good_condition, deterioration, damage, staining, debris
+
+   **Documentation:** overview, detail, measurement, comparison`;
+  }
 }
 
 // Call OpenAI GPT-4o-mini for vision analysis
@@ -218,7 +270,7 @@ export async function POST(req: NextRequest) {
 
     // Parse request body
     const body = await req.json();
-    const { photoId, imageData, gps, timestamp, sessionTimestamp, transcriptSegment, provider = 'openai', model = 'gpt-4o-mini' } = body;
+    const { photoId, imageData, gps, timestamp, sessionTimestamp, transcriptSegment, provider = 'openai', model = 'gpt-4o-mini', projectType = 'phase1-esa' } = body;
 
     // Validation
     if (!photoId || typeof photoId !== 'string') {
@@ -257,10 +309,12 @@ export async function POST(req: NextRequest) {
     console.log(`[AnalyzePhoto] Processing photo ${photoId}`);
     console.log(`[AnalyzePhoto] Image format: ${mediaType}, size: ${Math.round(base64Data.length / 1024)}KB`);
     console.log(`[AnalyzePhoto] GPS: ${gps ? 'available' : 'not available'}`);
+    console.log(`[AnalyzePhoto] Project type: ${projectType}`);
     console.log(`[AnalyzePhoto] Transcript context: ${transcriptSegment ? `"${transcriptSegment.text.substring(0, 50)}..."` : 'none'}`);
 
-    // Build ESA-specific prompt with transcript context
+    // Build project-type-specific prompt with transcript context
     const promptText = buildAnalysisPrompt(
+      projectType as ProjectType,
       gps,
       timestamp,
       sessionTimestamp || 0,
