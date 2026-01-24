@@ -15,6 +15,8 @@ export default function PhotoDetailPage() {
   const [photo, setPhoto] = useState<PhotoMetadata | null>(null);
   const [analysis, setAnalysis] = useState<PhotoAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
 
   // Override global overflow: hidden for this page
   useEffect(() => {
@@ -93,6 +95,45 @@ export default function PhotoDetailPage() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const handleAnalyze = async () => {
+    if (!photo) return;
+
+    setAnalyzing(true);
+    setAnalyzeError(null);
+
+    try {
+      console.log('[PhotoDetail] Starting analysis for photo:', photo.id);
+
+      const response = await fetch('/api/analyze-photo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          photoId: photo.id,
+          imageData: photo.imageData,
+          gps: photo.gps,
+          timestamp: photo.timestamp,
+          sessionTimestamp: photo.sessionTimestamp,
+          provider: 'openai',
+          model: 'gpt-4o-mini'
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Analysis failed');
+      }
+
+      const data = await response.json();
+      console.log('[PhotoDetail] Analysis complete:', data.analysis);
+      setAnalysis(data.analysis);
+    } catch (error: any) {
+      console.error('[PhotoDetail] Analysis error:', error);
+      setAnalyzeError(error.message || 'Failed to analyze photo');
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
@@ -169,14 +210,33 @@ export default function PhotoDetailPage() {
         </div>
       )}
 
-      {/* No Analysis Banner */}
-      {!analysis && (
+      {/* No Analysis - Show Analyze Button */}
+      {!analysis && !analyzing && (
         <div className="px-4 py-3 bg-gray-700">
-          <div className="flex items-center gap-2 text-gray-300">
+          <button
+            onClick={handleAnalyze}
+            className="w-full flex items-center justify-center gap-2 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors"
+          >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
             </svg>
-            <span className="text-sm">Process session to analyze for environmental concerns</span>
+            Analyze with AI (GPT-4o-mini)
+          </button>
+          {analyzeError && (
+            <p className="text-red-400 text-sm mt-2 text-center">{analyzeError}</p>
+          )}
+        </div>
+      )}
+
+      {/* Analyzing Spinner */}
+      {analyzing && (
+        <div className="px-4 py-4 bg-purple-900/30">
+          <div className="flex items-center justify-center gap-3">
+            <svg className="animate-spin w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span className="text-purple-300 font-medium">Analyzing photo...</span>
           </div>
         </div>
       )}
