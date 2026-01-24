@@ -170,9 +170,9 @@ export default function HomePage() {
   return (
     <div className="fixed inset-0 bg-gradient-to-b from-gray-900 to-black text-white overflow-y-scroll" style={{ WebkitOverflowScrolling: 'touch' }}>
       {/* Header */}
-      <div className="max-w-2xl mx-auto px-4 pt-6 pb-4">
+      <div className="max-w-2xl mx-auto px-4 pt-10 pb-6 text-center">
         <h1 className="text-3xl font-bold mb-1">ChoraGraph Capture</h1>
-        <p className="text-gray-400 text-sm">Environmental Field Evidence</p>
+        <p className="text-gray-400 text-sm">Capture. Document. Remember.</p>
       </div>
 
       {/* Work Types Row */}
@@ -229,11 +229,11 @@ export default function HomePage() {
         )}
       </div>
 
-      {/* Floating New Project Button - Same as original */}
+      {/* Floating New Project Button */}
       <div className="fixed bottom-6 left-0 right-0 flex justify-center z-40 px-4">
         <button
           onClick={() => setShowCreateModal(true)}
-          className="group relative px-8 py-4 rounded-full font-semibold transition-all duration-300 ease-out active:scale-95 hover:scale-105"
+          className="group relative px-8 py-12 rounded-full font-semibold transition-all duration-300 ease-out active:scale-95 hover:scale-105"
         >
           <div className="absolute inset-0 rounded-full bg-emerald-500/20 blur-xl group-hover:bg-emerald-400/30 transition-all duration-300" />
           <div className="absolute inset-0 rounded-full backdrop-blur-xl bg-white/10 border border-white/20 shadow-lg shadow-black/20" />
