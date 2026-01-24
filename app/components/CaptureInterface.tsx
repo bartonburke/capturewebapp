@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Project, SessionState, GpsStatus, GpsCoordinates, PhotoMetadata, AudioMetadata, ProjectContext, ProjectType, CompassStatus, CompassData } from '../lib/types';
+import { Project, SessionState, GpsStatus, GpsCoordinates, PhotoMetadata, AudioMetadata, ProjectContext, CompassStatus, CompassData } from '../lib/types';
 import { savePhoto, updateProject, saveAudio, getProject, getProjectPhotos } from '../lib/db';
+import { getTypeConfig } from '../lib/projectTypeConfig';
 import ThumbnailPicker from './ThumbnailPicker';
 
 interface Props {
@@ -15,15 +16,6 @@ interface Props {
 // At ~64kbps WebM Opus, 4 hours = ~115MB (well under limit)
 const MAX_SESSION_DURATION_SECONDS = 4 * 60 * 60; // 4 hours
 const WARNING_BEFORE_END_SECONDS = 5 * 60; // Warn 5 minutes before
-
-// Project type badge configuration
-const PROJECT_TYPE_BADGES: Record<ProjectType, { bg: string; label: string }> = {
-  'phase1-esa': { bg: 'bg-green-600', label: 'Phase I ESA' },
-  'eir-eis': { bg: 'bg-blue-600', label: 'EIR/EIS' },
-  'borehole': { bg: 'bg-orange-600', label: 'Borehole' },
-  'asset-tagging': { bg: 'bg-cyan-600', label: 'Asset Tagging' },
-  'generic': { bg: 'bg-gray-600', label: 'Site Visit' },
-};
 
 export default function CaptureInterface({ project, context }: Props) {
   const router = useRouter();
@@ -812,8 +804,8 @@ export default function CaptureInterface({ project, context }: Props) {
             <div className="text-center text-white px-6">
               <h1 className="text-2xl font-semibold mb-4">ChoraGraph Capture</h1>
               {/* Dynamic project type badge */}
-              <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium mb-2 ${PROJECT_TYPE_BADGES[project.projectType || 'phase1-esa']?.bg || 'bg-gray-600'}`}>
-                {PROJECT_TYPE_BADGES[project.projectType || 'phase1-esa']?.label || 'Site Visit'}
+              <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium mb-2 ${getTypeConfig(project.projectType || 'phase1-esa').bgColor.replace('/80', '')}`}>
+                {getTypeConfig(project.projectType || 'phase1-esa').label}
               </span>
               {error && <p className="text-red-400 text-sm mt-4">{error}</p>}
               {(sessionState === 'RECORDING' || sessionState === 'PAUSED') && !stream && (

@@ -59,7 +59,11 @@ export type CompassStatus = 'NOT_REQUESTED' | 'REQUESTING' | 'ACTIVE' | 'ERROR' 
 export type SessionState = 'NOT_STARTED' | 'RECORDING' | 'PAUSED' | 'ENDED';
 
 // Multi-project platform support types
-export type ProjectType = 'phase1-esa' | 'eir-eis' | 'borehole' | 'asset-tagging' | 'generic';
+export type ProjectType =
+  | 'phase1-esa' | 'eir-eis' | 'borehole' | 'asset-tagging' | 'generic'  // work
+  | 'home-inventory' | 'travel-log' | 'personal-todos';                   // personal
+
+export type ProjectCategory = 'work' | 'personal';
 export type ProcessingStage = 'captured' | 'transcribed' | 'analyzed' | 'graph_ready';
 
 // Entity schema for dynamic configuration per project type

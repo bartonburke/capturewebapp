@@ -1,6 +1,7 @@
 'use client';
 
-import { Project, ProjectType } from '../lib/types';
+import { Project } from '../lib/types';
+import { getTypeConfig } from '../lib/projectTypeConfig';
 
 interface ProjectCardProps {
   project: Project;
@@ -8,17 +9,8 @@ interface ProjectCardProps {
   onDelete: () => void;
 }
 
-// Project type badge configuration
-const PROJECT_TYPE_BADGES: Record<ProjectType, { bg: string; label: string }> = {
-  'phase1-esa': { bg: 'bg-green-600', label: 'Phase I ESA' },
-  'eir-eis': { bg: 'bg-blue-600', label: 'EIR/EIS' },
-  'borehole': { bg: 'bg-orange-600', label: 'Borehole' },
-  'asset-tagging': { bg: 'bg-cyan-600', label: 'Asset Tagging' },
-  'generic': { bg: 'bg-gray-600', label: 'Site Visit' },
-};
-
 export default function ProjectCard({ project, onClick, onDelete }: ProjectCardProps) {
-  const badge = PROJECT_TYPE_BADGES[project.projectType || 'phase1-esa'] || PROJECT_TYPE_BADGES['generic'];
+  const typeConfig = getTypeConfig(project.projectType || 'phase1-esa');
 
   return (
     <div className="group relative bg-white/10 backdrop-blur-sm rounded-xl overflow-hidden transition-all hover:bg-white/15">
@@ -42,8 +34,8 @@ export default function ProjectCard({ project, onClick, onDelete }: ProjectCardP
             </div>
           )}
           {/* Project type badge - bottom of thumbnail */}
-          <span className={`absolute bottom-0 left-0 right-0 text-[9px] px-1.5 py-1 ${badge.bg} text-white font-medium text-center`}>
-            {badge.label}
+          <span className={`absolute bottom-0 left-0 right-0 text-[9px] px-1.5 py-1 ${typeConfig.bgColor.replace('/80', '')} text-white font-medium text-center`}>
+            {typeConfig.shortLabel}
           </span>
         </div>
 

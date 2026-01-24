@@ -3,18 +3,23 @@
 import { useState } from 'react';
 import { Project, ProjectType } from '../lib/types';
 import { createProject } from '../lib/db';
+import { getTypeConfig, getAllProjectTypes } from '../lib/projectTypeConfig';
 
 interface Props {
   onClose: () => void;
   onProjectCreated: (project: Project) => void;
+  preselectedType?: ProjectType;
 }
 
-export default function CreateProjectModal({ onClose, onProjectCreated }: Props) {
+export default function CreateProjectModal({ onClose, onProjectCreated, preselectedType }: Props) {
   const [name, setName] = useState('');
   const [lead, setLead] = useState('');
   const [notes, setNotes] = useState('');
-  const [projectType, setProjectType] = useState<ProjectType>('phase1-esa');
+  const [projectType, setProjectType] = useState<ProjectType>(preselectedType || 'phase1-esa');
   const [saving, setSaving] = useState(false);
+
+  const allTypes = getAllProjectTypes();
+  const selectedTypeConfig = getTypeConfig(projectType);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,17 +81,24 @@ export default function CreateProjectModal({ onClose, onProjectCreated }: Props)
 
           <div>
             <label className="block text-sm font-medium mb-1 text-white">Project Type</label>
-            <select
-              value={projectType}
-              onChange={(e) => setProjectType(e.target.value as ProjectType)}
-              className="w-full px-4 py-2 bg-black/40 border border-white/30 rounded-lg focus:outline-none focus:border-blue-500 text-white"
-            >
-              <option value="phase1-esa">Phase I ESA</option>
-              <option value="eir-eis">EIR/EIS</option>
-              <option value="borehole">Borehole Analysis</option>
-              <option value="asset-tagging">Asset Tagging</option>
-              <option value="generic">General Site Visit</option>
-            </select>
+            {preselectedType ? (
+              <div className="flex items-center gap-2 px-4 py-2 bg-black/40 border border-white/30 rounded-lg text-white">
+                <span className="text-lg">{selectedTypeConfig.icon}</span>
+                <span>{selectedTypeConfig.label}</span>
+              </div>
+            ) : (
+              <select
+                value={projectType}
+                onChange={(e) => setProjectType(e.target.value as ProjectType)}
+                className="w-full px-4 py-2 bg-black/40 border border-white/30 rounded-lg focus:outline-none focus:border-blue-500 text-white"
+              >
+                {allTypes.map(config => (
+                  <option key={config.type} value={config.type}>
+                    {config.icon} {config.label}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
           <div>

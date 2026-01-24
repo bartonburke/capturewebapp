@@ -198,6 +198,109 @@ const genericEntities: EntitySchemaItem[] = [
   },
 ];
 
+// Home Inventory entity schema
+const homeInventoryEntities: EntitySchemaItem[] = [
+  {
+    name: 'item',
+    displayName: 'Item',
+    description: 'Household item or possession',
+    extractionKeywords: ['item', 'appliance', 'furniture', 'electronics', 'device'],
+    confidenceThreshold: 0.7,
+  },
+  {
+    name: 'value',
+    displayName: 'Estimated Value',
+    description: 'Purchase price or estimated value',
+    extractionKeywords: ['price', 'cost', 'value', 'worth', 'paid'],
+    confidenceThreshold: 0.6,
+  },
+  {
+    name: 'serial_number',
+    displayName: 'Serial Number',
+    description: 'Product serial number or model number',
+    extractionKeywords: ['serial', 'model', 'part number', 'barcode'],
+    confidenceThreshold: 0.8,
+  },
+  {
+    name: 'location',
+    displayName: 'Location',
+    description: 'Room or area in home',
+    extractionKeywords: ['room', 'bedroom', 'kitchen', 'living room', 'garage', 'basement'],
+    confidenceThreshold: 0.7,
+  },
+  {
+    name: 'receipt',
+    displayName: 'Receipt/Documentation',
+    description: 'Proof of purchase or warranty info',
+    extractionKeywords: ['receipt', 'warranty', 'invoice', 'purchase date'],
+    confidenceThreshold: 0.6,
+  },
+];
+
+// Travel Log entity schema
+const travelLogEntities: EntitySchemaItem[] = [
+  {
+    name: 'location',
+    displayName: 'Location',
+    description: 'Place visited or landmark',
+    extractionKeywords: ['place', 'city', 'landmark', 'attraction', 'restaurant', 'hotel'],
+    confidenceThreshold: 0.7,
+  },
+  {
+    name: 'experience',
+    displayName: 'Experience',
+    description: 'Activity or experience',
+    extractionKeywords: ['activity', 'tour', 'hike', 'meal', 'event', 'show'],
+    confidenceThreshold: 0.6,
+  },
+  {
+    name: 'expense',
+    displayName: 'Expense',
+    description: 'Cost or expense incurred',
+    extractionKeywords: ['cost', 'price', 'paid', 'tip', 'bill', 'budget'],
+    confidenceThreshold: 0.6,
+  },
+  {
+    name: 'memory',
+    displayName: 'Memory',
+    description: 'Notable moment or memory',
+    extractionKeywords: ['memory', 'moment', 'highlight', 'favorite', 'amazing'],
+    confidenceThreshold: 0.5,
+  },
+];
+
+// Personal To-dos entity schema
+const personalTodosEntities: EntitySchemaItem[] = [
+  {
+    name: 'task',
+    displayName: 'Task',
+    description: 'Action item to complete',
+    extractionKeywords: ['task', 'todo', 'need to', 'should', 'must', 'reminder'],
+    confidenceThreshold: 0.7,
+  },
+  {
+    name: 'deadline',
+    displayName: 'Deadline',
+    description: 'Due date or time constraint',
+    extractionKeywords: ['deadline', 'due', 'by', 'before', 'date', 'tomorrow', 'next week'],
+    confidenceThreshold: 0.7,
+  },
+  {
+    name: 'priority',
+    displayName: 'Priority',
+    description: 'Urgency or importance level',
+    extractionKeywords: ['urgent', 'important', 'critical', 'priority', 'asap'],
+    confidenceThreshold: 0.6,
+  },
+  {
+    name: 'context',
+    displayName: 'Context',
+    description: 'Where or when to do the task',
+    extractionKeywords: ['at home', 'at work', 'when', 'where', 'call', 'email', 'buy'],
+    confidenceThreshold: 0.5,
+  },
+];
+
 // Default capture prompts per project type
 const phase1EsaPrompts = [
   'Document underground storage tanks (USTs) and fill pipes',
@@ -241,6 +344,33 @@ const genericPrompts = [
   'Capture location context',
 ];
 
+const homeInventoryPrompts = [
+  'Read the serial number and model aloud',
+  'Note the room or location',
+  'Describe the item and its condition',
+  'Photograph any receipts or warranty cards',
+  'Mention the approximate value or purchase date',
+  'Capture brand labels and identifying features',
+];
+
+const travelLogPrompts = [
+  'Describe where you are and what you see',
+  'Note the name of this landmark or location',
+  'Share what makes this place memorable',
+  'Mention any costs or tips for future reference',
+  'Describe the food, atmosphere, or experience',
+  'Capture the local culture or unique details',
+];
+
+const personalTodosPrompts = [
+  'Describe the task that needs to be done',
+  'Mention any deadline or due date',
+  'Note the priority or urgency',
+  'Say where or when this should be done',
+  'Capture any reference materials',
+  'Add any context or details needed',
+];
+
 // Vision analysis prompts per project type
 const phase1EsaVisionPrompt = `Analyze this photo for environmental concerns per ASTM E1527-21.
 Identify potential Recognized Environmental Conditions (RECs), underground storage tanks,
@@ -269,6 +399,34 @@ Provide specific observations for inventory documentation.`;
 
 const genericVisionPrompt = `Analyze this photo and describe the site conditions,
 notable features, and any observations relevant to environmental or engineering assessment.`;
+
+const homeInventoryVisionPrompt = `Analyze this photo for home inventory documentation.
+Identify and extract:
+- Item type and description (furniture, electronics, appliances, etc.)
+- Visible serial numbers, model numbers, or barcodes
+- Brand/manufacturer if visible
+- Condition assessment (new, good, fair, needs repair)
+- Location context (room type visible in background)
+- Estimated value category if apparent from brand/quality
+Provide specific observations for insurance documentation.`;
+
+const travelLogVisionPrompt = `Analyze this travel photo and describe:
+- Location or landmark identification if recognizable
+- Key visual elements and atmosphere
+- Cultural or historical significance if apparent
+- Text visible on signs, menus, or plaques (translate if needed)
+- Memorable details worth noting
+- Suggestions for future visitors based on what's shown
+Capture the essence of this travel moment.`;
+
+const personalTodosVisionPrompt = `Analyze this photo for task-related content.
+Identify and extract:
+- Any text visible (notes, lists, reminders)
+- Action items that can be inferred
+- Deadlines or dates mentioned
+- Context clues about what needs to be done
+- Reference information that might be useful
+Convert visual content into actionable task items.`;
 
 // Export default contexts
 export const DEFAULT_CONTEXTS: Record<ProjectType, ProjectContext> = {
@@ -301,6 +459,24 @@ export const DEFAULT_CONTEXTS: Record<ProjectType, ProjectContext> = {
     entitySchema: genericEntities,
     capturePrompts: genericPrompts,
     visionAnalysisPrompt: genericVisionPrompt,
+  },
+  'home-inventory': {
+    projectType: 'home-inventory',
+    entitySchema: homeInventoryEntities,
+    capturePrompts: homeInventoryPrompts,
+    visionAnalysisPrompt: homeInventoryVisionPrompt,
+  },
+  'travel-log': {
+    projectType: 'travel-log',
+    entitySchema: travelLogEntities,
+    capturePrompts: travelLogPrompts,
+    visionAnalysisPrompt: travelLogVisionPrompt,
+  },
+  'personal-todos': {
+    projectType: 'personal-todos',
+    entitySchema: personalTodosEntities,
+    capturePrompts: personalTodosPrompts,
+    visionAnalysisPrompt: personalTodosVisionPrompt,
   },
 };
 
