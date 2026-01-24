@@ -4,6 +4,9 @@
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import { NextRequest, NextResponse } from 'next/server';
 
+// Support both BLOB_READ_WRITE_TOKEN (default) and Audio_READ_WRITE_TOKEN (Vercel auto-generated)
+const token = process.env.BLOB_READ_WRITE_TOKEN || process.env.Audio_READ_WRITE_TOKEN;
+
 export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as HandleUploadBody;
@@ -11,6 +14,7 @@ export async function POST(req: NextRequest) {
     const jsonResponse = await handleUpload({
       body,
       request: req,
+      token,
       onBeforeGenerateToken: async (pathname) => {
         // Validate it's an audio file and set size limits
         return {
