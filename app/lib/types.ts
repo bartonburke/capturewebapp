@@ -9,6 +9,8 @@ export interface Project {
   modifiedAt: string;      // ISO8601
   photoCount: number;      // Total photos
   audioCount: number;      // Total audio recordings
+  thumbnail?: string;      // Base64 thumbnail from first photo (small, ~200x200)
+  thumbnailPhotoId?: string; // ID of selected cover photo
 
   // Multi-project platform support fields
   projectType: ProjectType;           // Default: 'phase1-esa' for migration
@@ -25,11 +27,18 @@ export interface GpsCoordinates {
   timestamp: number;       // Unix timestamp
 }
 
+export interface CompassData {
+  heading: number;         // 0-360 degrees (0 = North, 90 = East, etc.)
+  accuracy?: number;       // degrees of accuracy (iOS provides this)
+  timestamp: number;       // Unix timestamp when reading was taken
+}
+
 export interface PhotoMetadata {
   id: string;              // UUID
   timestamp: string;       // ISO8601
   projectId: string;       // Link to parent project
   gps: GpsCoordinates | null;
+  compass: CompassData | null;  // Device compass heading when photo was taken
   imageData: string;       // Base64 encoded JPEG
   sessionTimestamp: number;  // Session duration when captured
 }
@@ -46,6 +55,7 @@ export interface AudioMetadata {
 }
 
 export type GpsStatus = 'NOT_REQUESTED' | 'REQUESTING' | 'ACTIVE' | 'ERROR' | 'DENIED';
+export type CompassStatus = 'NOT_REQUESTED' | 'REQUESTING' | 'ACTIVE' | 'ERROR' | 'DENIED' | 'UNSUPPORTED';
 export type SessionState = 'NOT_STARTED' | 'RECORDING' | 'PAUSED' | 'ENDED';
 
 // Multi-project platform support types
@@ -130,10 +140,13 @@ export interface PhotoAnalysis {
 
 // Photo-specific entity (simpler than ExtractedEntity for Phase 4)
 export interface PhotoEntity {
-  type: 'REC' | 'AOC' | 'Feature' | 'Equipment' | 'Condition';
+  type: 'REC' | 'AOC' | 'Feature' | 'Equipment' | 'Condition' | 'ActionItem' | 'Question' | 'Observation';
   description: string;
   severity: 'high' | 'medium' | 'low' | 'info';
   recommendation?: string;
+  // New fields for transcript-aware analysis
+  consultantContext?: string;  // What the consultant said that prompted this
+  aiResponse?: string;         // AI's answer to a question, if applicable
 }
 
 // ESA entity types

@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Project, SessionState, GpsStatus, GpsCoordinates, PhotoMetadata, AudioMetadata, ProjectContext, ProjectType } from '../lib/types';
-import { savePhoto, updateProject, saveAudio, getProject } from '../lib/db';
+import { Project, SessionState, GpsStatus, GpsCoordinates, PhotoMetadata, AudioMetadata, ProjectContext, ProjectType, CompassStatus, CompassData } from '../lib/types';
+import { savePhoto, updateProject, saveAudio, getProject, getProjectPhotos } from '../lib/db';
+import ThumbnailPicker from './ThumbnailPicker';
 
 interface Props {
   project: Project;
@@ -32,6 +33,11 @@ export default function CaptureInterface({ project, context }: Props) {
   const [currentGps, setCurrentGps] = useState<GpsCoordinates | null>(null);
   const [gpsError, setGpsError] = useState<string | null>(null);
 
+  // Compass state
+  const [compassStatus, setCompassStatus] = useState<CompassStatus>('NOT_REQUESTED');
+  const [currentCompass, setCurrentCompass] = useState<CompassData | null>(null);
+  const [compassError, setCompassError] = useState<string | null>(null);
+
   // Audio recording state
   const [audioRecorder, setAudioRecorder] = useState<MediaRecorder | null>(null);
   const [audioError, setAudioError] = useState<string | null>(null);
@@ -41,6 +47,10 @@ export default function CaptureInterface({ project, context }: Props) {
   // Capture prompts rotation state
   const [currentPromptIndex, setCurrentPromptIndex] = useState(0);
   const capturePrompts = context?.capturePrompts || [];
+
+  // Thumbnail picker state
+  const [showThumbnailPicker, setShowThumbnailPicker] = useState(false);
+  const [sessionPhotos, setSessionPhotos] = useState<PhotoMetadata[]>([]);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -267,10 +277,95 @@ export default function CaptureInterface({ project, context }: Props) {
     setGpsError(null);
   };
 
-  // Cleanup GPS on unmount
+  // Compass initialization
+  const initializeCompass = async () => {
+    // Check if DeviceOrientationEvent is available
+    if (!('DeviceOrientationEvent' in window)) {
+      setCompassStatus('UNSUPPORTED');
+      setCompassError('Compass not supported');
+      return;
+    }
+
+    setCompassStatus('REQUESTING');
+    setCompassError(null);
+
+    // iOS 13+ requires explicit permission request
+    const DeviceOrientationEventTyped = DeviceOrientationEvent as unknown as {
+      requestPermission?: () => Promise<'granted' | 'denied'>;
+    };
+
+    if (typeof DeviceOrientationEventTyped.requestPermission === 'function') {
+      try {
+        const permission = await DeviceOrientationEventTyped.requestPermission();
+        if (permission !== 'granted') {
+          setCompassStatus('DENIED');
+          setCompassError('Compass permission denied');
+          return;
+        }
+      } catch (err) {
+        console.error('Compass permission error:', err);
+        setCompassStatus('ERROR');
+        setCompassError('Compass permission error');
+        return;
+      }
+    }
+
+    // Add event listener for device orientation
+    const handleOrientation = (event: DeviceOrientationEvent) => {
+      // webkitCompassHeading is available on iOS and gives true north heading
+      // alpha gives rotation around z-axis (compass heading on Android, but needs calibration)
+      const webkitHeading = (event as DeviceOrientationEvent & { webkitCompassHeading?: number }).webkitCompassHeading;
+      const webkitAccuracy = (event as DeviceOrientationEvent & { webkitCompassAccuracy?: number }).webkitCompassAccuracy;
+
+      let heading: number | null = null;
+
+      if (typeof webkitHeading === 'number' && webkitHeading >= 0) {
+        // iOS - use webkitCompassHeading (true north)
+        heading = webkitHeading;
+      } else if (typeof event.alpha === 'number') {
+        // Android/other - alpha is rotation from north (but may need adjustment)
+        // Note: On Android, alpha=0 means device is pointing in the same direction it was
+        // when the sensor was last calibrated. For true north, we'd need to use
+        // event.absolute === true, but this isn't widely supported.
+        // For now, we use alpha as a relative heading (better than nothing)
+        heading = (360 - event.alpha) % 360;
+      }
+
+      if (heading !== null) {
+        setCurrentCompass({
+          heading: Math.round(heading),
+          accuracy: typeof webkitAccuracy === 'number' ? webkitAccuracy : undefined,
+          timestamp: Date.now(),
+        });
+        setCompassStatus('ACTIVE');
+        setCompassError(null);
+      }
+    };
+
+    window.addEventListener('deviceorientation', handleOrientation, true);
+
+    // Store cleanup function
+    (window as Window & { _compassCleanup?: () => void })._compassCleanup = () => {
+      window.removeEventListener('deviceorientation', handleOrientation, true);
+    };
+  };
+
+  const stopCompass = () => {
+    const cleanup = (window as Window & { _compassCleanup?: () => void })._compassCleanup;
+    if (cleanup) {
+      cleanup();
+      delete (window as Window & { _compassCleanup?: () => void })._compassCleanup;
+    }
+    setCompassStatus('NOT_REQUESTED');
+    setCurrentCompass(null);
+    setCompassError(null);
+  };
+
+  // Cleanup GPS and compass on unmount
   useEffect(() => {
     return () => {
       stopGps();
+      stopCompass();
     };
   }, []);
 
@@ -308,6 +403,7 @@ export default function CaptureInterface({ project, context }: Props) {
     setSessionState('RECORDING');
     setDuration(0);
     initializeGps();
+    initializeCompass();
 
     // Initialize audio recorder when stream is ready
     if (stream) {
@@ -347,6 +443,7 @@ export default function CaptureInterface({ project, context }: Props) {
               timestamp: new Date().toISOString(),
               projectId: project.id,
               gps: currentGps ? { ...currentGps } : null,
+              compass: currentCompass ? { ...currentCompass } : null,
               imageData: base64data,
               sessionTimestamp: duration,
             };
@@ -375,7 +472,10 @@ export default function CaptureInterface({ project, context }: Props) {
               projectName: project.name,
               gps: currentGps
                 ? `${currentGps.latitude.toFixed(6)}, ${currentGps.longitude.toFixed(6)} (±${Math.round(currentGps.accuracy)}m)`
-                : 'No GPS'
+                : 'No GPS',
+              compass: currentCompass
+                ? `${currentCompass.heading}° ${currentCompass.accuracy ? `(±${currentCompass.accuracy}°)` : ''}`
+                : 'No compass'
             });
           };
 
@@ -482,9 +582,10 @@ export default function CaptureInterface({ project, context }: Props) {
     }
   };
 
-  const handleEndSession = () => {
+  const handleEndSession = async () => {
     setSessionState('ENDED');
     stopGps();
+    stopCompass();
 
     // Stop audio recorder (will trigger onstop callback which saves audio)
     if (audioRecorder && audioRecorder.state !== 'inactive') {
@@ -499,6 +600,82 @@ export default function CaptureInterface({ project, context }: Props) {
 
     // Reset audio recorder
     setAudioRecorder(null);
+
+    // Fetch photos for thumbnail picker
+    try {
+      const photos = await getProjectPhotos(project.id);
+      // Sort by timestamp (most recent first for selection)
+      photos.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      setSessionPhotos(photos);
+      setShowThumbnailPicker(true);
+    } catch (error) {
+      console.error('Failed to fetch photos for thumbnail picker:', error);
+      // Navigate anyway if we can't fetch photos
+      router.push(`/project/${project.id}`);
+    }
+  };
+
+  const handleThumbnailSelect = async (photoId: string, thumbnailData: string) => {
+    try {
+      const currentProject = await getProject(project.id);
+      if (currentProject) {
+        // Create a smaller thumbnail from the selected photo
+        const thumbnail = await createThumbnail(thumbnailData, 200);
+
+        const updatedProject = {
+          ...currentProject,
+          thumbnailPhotoId: photoId,
+          thumbnail: thumbnail,
+          modifiedAt: new Date().toISOString(),
+        };
+        await updateProject(updatedProject);
+        console.log('Thumbnail saved for project:', project.id);
+      }
+    } catch (error) {
+      console.error('Failed to save thumbnail:', error);
+    }
+
+    // Navigate to project review page
+    router.push(`/project/${project.id}`);
+  };
+
+  const handleThumbnailSkip = () => {
+    // Navigate to project review without selecting thumbnail
+    router.push(`/project/${project.id}`);
+  };
+
+  // Helper to create a smaller thumbnail from base64 image
+  const createThumbnail = (base64Image: string, maxSize: number): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Calculate dimensions maintaining aspect ratio
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxSize) {
+            height = Math.round((height * maxSize) / width);
+            width = maxSize;
+          }
+        } else {
+          if (height > maxSize) {
+            width = Math.round((width * maxSize) / height);
+            height = maxSize;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        resolve(canvas.toDataURL('image/jpeg', 0.7));
+      };
+      img.src = base64Image;
+    });
   };
 
   const formatDuration = (seconds: number): string => {
@@ -544,6 +721,33 @@ export default function CaptureInterface({ project, context }: Props) {
       case 'REQUESTING': return 'Acquiring...';
       case 'DENIED': return 'Denied';
       case 'ERROR': return 'Unavailable';
+      default: return '';
+    }
+  };
+
+  const getCompassStatusColor = () => {
+    switch (compassStatus) {
+      case 'ACTIVE': return 'text-blue-400';
+      case 'REQUESTING': return 'text-yellow-400 animate-pulse';
+      case 'ERROR':
+      case 'DENIED':
+      case 'UNSUPPORTED': return 'text-gray-500';
+      default: return 'text-gray-400';
+    }
+  };
+
+  const getCompassStatusText = () => {
+    if (compassStatus === 'ACTIVE' && currentCompass) {
+      // Convert heading to cardinal direction
+      const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+      const index = Math.round(currentCompass.heading / 45) % 8;
+      return `${currentCompass.heading}° ${directions[index]}`;
+    }
+    switch (compassStatus) {
+      case 'REQUESTING': return 'Calibrating...';
+      case 'DENIED': return 'Denied';
+      case 'ERROR': return 'Error';
+      case 'UNSUPPORTED': return 'N/A';
       default: return '';
     }
   };
@@ -627,6 +831,22 @@ export default function CaptureInterface({ project, context }: Props) {
                 </svg>
                 <span className="text-xs text-white">
                   {getGpsStatusText()}
+                </span>
+              </div>
+            )}
+
+            {/* Compass Status */}
+            {sessionState !== 'NOT_STARTED' && sessionState !== 'ENDED' && compassStatus !== 'UNSUPPORTED' && (
+              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-black/40">
+                <svg
+                  className={`w-3 h-3 ${getCompassStatusColor()}`}
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.586L7.707 11.88a1 1 0 101.414 1.414l2.293-2.293A1 1 0 0011.707 10V7z" clipRule="evenodd" />
+                </svg>
+                <span className="text-xs text-white">
+                  {getCompassStatusText()}
                 </span>
               </div>
             )}
@@ -723,31 +943,28 @@ export default function CaptureInterface({ project, context }: Props) {
           </div>
         )}
 
-        {sessionState === 'ENDED' && (
+        {sessionState === 'ENDED' && !showThumbnailPicker && (
           <div className="flex flex-col gap-4 text-center">
             <div className="text-white mb-2">
-              <p className="text-lg font-semibold mb-1">Session Complete</p>
+              <p className="text-lg font-semibold mb-1">Processing...</p>
               <p className="text-gray-300 text-sm">
-                Duration: {formatDuration(duration)} | Photos: {photoCount}
+                Preparing your photos
               </p>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => router.push('/')}
-                className="py-3 px-6 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-lg transition-colors active:scale-95"
-              >
-                Back to Projects
-              </button>
-              <button
-                onClick={() => setSessionState('NOT_STARTED')}
-                className="py-3 px-6 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors active:scale-95"
-              >
-                New Session
-              </button>
             </div>
           </div>
         )}
       </div>
+
+      {/* Thumbnail Picker Modal */}
+      {showThumbnailPicker && (
+        <ThumbnailPicker
+          photos={sessionPhotos}
+          onSelect={handleThumbnailSelect}
+          onSkip={handleThumbnailSkip}
+          sessionDuration={formatDuration(duration)}
+          photoCount={photoCount}
+        />
+      )}
     </div>
   );
 }

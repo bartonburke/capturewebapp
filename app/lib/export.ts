@@ -1,7 +1,7 @@
 // Export utilities for ChoraGraph Capture PWA
 
 import JSZip from 'jszip';
-import { Project, PhotoMetadata, AudioMetadata, ProcessingResult, GpsCoordinates, ProjectType, ProcessingStage } from './types';
+import { Project, PhotoMetadata, AudioMetadata, GpsCoordinates, CompassData, ProjectType, ProcessingStage } from './types';
 
 interface ExportData {
   project: Omit<Project, 'photoCount' | 'audioCount'>;
@@ -88,6 +88,7 @@ export async function exportProject(
       timestamp: photo.timestamp,
       sessionTimestamp: photo.sessionTimestamp,
       gps: photo.gps,
+      compass: photo.compass,
       filename,
     };
   });
@@ -181,18 +182,21 @@ export function generateExportFilename(projectName: string): string {
 interface PortablePhotoEntry {
   filename: string;
   gps?: GpsCoordinates;
-  timestamp: string;
+  compass?: CompassData;       // Compass heading when photo was taken
+  timestamp: string;           // ISO8601 absolute timestamp
+  session_seconds?: number;    // Seconds into session when photo was taken (for transcript correlation)
   audio_segment?: {
     start: string;  // "HH:MM:SS" format
     end: string;
   };
-  transcript?: string;
+  transcript?: string;         // Matched transcript text (added by desktop processing)
   entities?: string[];
   vision_analysis?: {
     description: string;
     concerns: string[];
     rec_potential: 'high' | 'medium' | 'low' | 'none';
     confidence: number;
+    ai_response?: string;      // Answer to consultant's question (if detected)
   };
   tags: string[];
 }
@@ -226,7 +230,7 @@ interface PortableEvidenceIndex {
   };
   processing_stage: ProcessingStage;
   graph_ready: boolean;
-  version: '2.0';
+  version: '2.0' | '2.1';  // 2.1 = raw capture (no AI processing)
 }
 
 /**
@@ -240,76 +244,23 @@ function formatTimestamp(seconds: number): string {
 }
 
 /**
- * Determine REC potential from photo analysis
- */
-function determineRecPotential(analysis: ProcessingResult['photoAnalyses'][0]): 'high' | 'medium' | 'low' | 'none' {
-  if (!analysis?.entities?.length) return 'none';
-
-  const hasHighSeverity = analysis.entities.some(e => e.severity === 'high');
-  const hasMediumSeverity = analysis.entities.some(e => e.severity === 'medium');
-  const hasRec = analysis.entities.some(e => e.type === 'REC');
-
-  if (hasRec || hasHighSeverity) return 'high';
-  if (hasMediumSeverity) return 'medium';
-  return 'low';
-}
-
-/**
- * Count entities from processing result
- */
-function countEntities(result?: ProcessingResult): Record<string, number> {
-  if (!result?.photoAnalyses) return {};
-
-  const counts: Record<string, number> = {};
-  for (const analysis of result.photoAnalyses) {
-    if (analysis.entities) {
-      for (const entity of analysis.entities) {
-        counts[entity.type] = (counts[entity.type] || 0) + 1;
-      }
-    }
-  }
-  return counts;
-}
-
-/**
- * Extract key observations from processing result
- */
-function extractKeyObservations(result?: ProcessingResult): string[] {
-  if (!result?.photoAnalyses) return [];
-
-  const observations: string[] = [];
-
-  // Get high-severity findings
-  for (const analysis of result.photoAnalyses) {
-    if (analysis.entities) {
-      for (const entity of analysis.entities) {
-        if (entity.severity === 'high' || entity.type === 'REC') {
-          observations.push(entity.description);
-        }
-      }
-    }
-  }
-
-  // Limit to 10 key observations
-  return observations.slice(0, 10);
-}
-
-/**
- * Export project as a Portable Evidence Package (v2.0)
+ * Export project as a Portable Evidence Package (v2.1 - Raw Capture)
+ *
+ * Mobile exports raw capture data only. AI processing happens on desktop.
+ *
  * Structure:
  *   site-visit-YYYY-MM-DD-uuid/
- *   ├── index.json
- *   ├── session-audio.m4a
- *   ├── transcript.txt
+ *   ├── index.json          (metadata, processing_stage: 'captured')
+ *   ├── session-audio.webm  (raw audio recording)
+ *   ├── thumbnail.jpg       (project thumbnail from first photo)
  *   └── photos/
- *       ├── 001-contextual-name.jpg
+ *       ├── 001-site-photo.jpg
  *       └── ...
  */
 export async function exportPortableEvidencePackage(
   project: Project,
   photos: PhotoMetadata[],
-  audio: AudioMetadata[],
-  processingResult?: ProcessingResult
+  audio: AudioMetadata[]
 ): Promise<Blob> {
   const zip = new JSZip();
 
@@ -321,34 +272,22 @@ export async function exportPortableEvidencePackage(
 
   const photoEntries: PortablePhotoEntry[] = [];
 
-  // Process photos with contextual filenames
+  // Process photos - simple sequential naming (AI will add contextual names)
   for (let i = 0; i < photos.length; i++) {
     const photo = photos[i];
-    const analysis = processingResult?.photoAnalyses?.find(pa => pa.photoId === photo.id);
-
-    // Generate contextual filename from analysis tags
     const photoNumber = String(i + 1).padStart(3, '0');
-    let contextSuffix = 'site-photo';
-
-    if (analysis?.catalogTags?.length) {
-      // Use first 2 tags for filename context
-      contextSuffix = analysis.catalogTags
-        .slice(0, 2)
-        .map(tag => sanitizeFilename(tag))
-        .join('-');
-    }
-
-    const filename = `${photoNumber}-${contextSuffix}.jpg`;
+    const filename = `${photoNumber}-site-photo.jpg`;
 
     // Add photo to zip
     const photoBlob = dataURLtoBlob(photo.imageData);
     photosFolder.file(filename, photoBlob);
 
-    // Build photo entry for index.json
+    // Build photo entry for index.json (raw metadata only)
     const entry: PortablePhotoEntry = {
       filename,
       timestamp: photo.timestamp,
-      tags: analysis?.catalogTags || [],
+      session_seconds: photo.sessionTimestamp, // Relative time for transcript correlation
+      tags: [], // Will be populated by desktop AI processing
     };
 
     // Add GPS if available
@@ -356,34 +295,24 @@ export async function exportPortableEvidencePackage(
       entry.gps = photo.gps;
     }
 
-    // Add transcript segment if correlated
-    if (analysis?.transcriptSegment) {
-      entry.audio_segment = {
-        start: formatTimestamp(analysis.transcriptSegment.start),
-        end: formatTimestamp(analysis.transcriptSegment.end),
-      };
-      entry.transcript = analysis.transcriptSegment.text;
-    }
-
-    // Add entities if extracted
-    if (analysis?.entities?.length) {
-      entry.entities = analysis.entities.map(e => e.type);
-    }
-
-    // Add vision analysis if available
-    if (analysis?.vlmDescription) {
-      entry.vision_analysis = {
-        description: analysis.vlmDescription,
-        concerns: analysis.entities?.map(e => e.description) || [],
-        rec_potential: determineRecPotential(analysis),
-        confidence: 0.85, // Could be enhanced with actual confidence scores
-      };
+    // Add compass heading if available
+    if (photo.compass) {
+      entry.compass = photo.compass;
     }
 
     photoEntries.push(entry);
   }
 
-  // Export audio as single session file (not in subfolder)
+  // Generate thumbnail from first photo
+  if (photos.length > 0) {
+    const thumbnail = await generateThumbnail(photos[0].imageData, 200, 200);
+    if (thumbnail) {
+      const thumbnailBlob = dataURLtoBlob(thumbnail);
+      zip.file('thumbnail.jpg', thumbnailBlob);
+    }
+  }
+
+  // Export audio as single session file
   if (audio.length > 0) {
     const primaryAudio = audio[0];
     const audioBlob = dataURLtoBlob(primaryAudio.audioData);
@@ -391,12 +320,7 @@ export async function exportPortableEvidencePackage(
     zip.file(`session-audio.${ext}`, audioBlob);
   }
 
-  // Export transcript as plain text
-  if (processingResult?.transcript?.fullText) {
-    zip.file('transcript.txt', processingResult.transcript.fullText);
-  }
-
-  // Build index.json
+  // Build index.json (raw capture metadata - no AI analysis)
   const index: PortableEvidenceIndex = {
     session_id: project.launchSessionId || project.id,
     project_id: project.externalProjectId,
@@ -406,26 +330,17 @@ export async function exportPortableEvidencePackage(
     timestamp_end: project.modifiedAt,
     location_start: photos[0]?.gps || undefined,
     photos: photoEntries,
-    // Include full transcript in JSON for programmatic access
-    transcript: processingResult?.transcript ? {
-      full_text: processingResult.transcript.fullText,
-      language: processingResult.transcript.language,
-      duration_seconds: processingResult.transcript.duration,
-      segments: processingResult.transcript.segments?.map(seg => ({
-        start: seg.start,
-        end: seg.end,
-        text: seg.text,
-      })),
-    } : undefined,
+    // No transcript yet - will be added by desktop processing
+    transcript: undefined,
     session_summary: {
       total_photos: photos.length,
       total_duration_seconds: audio[0]?.duration || 0,
-      entities_extracted: countEntities(processingResult),
-      key_observations: extractKeyObservations(processingResult),
+      entities_extracted: {}, // Will be populated by desktop AI processing
+      key_observations: [],   // Will be populated by desktop AI processing
     },
-    processing_stage: project.processingStage || 'captured',
-    graph_ready: project.processingStage === 'graph_ready',
-    version: '2.0',
+    processing_stage: 'captured', // Always 'captured' - desktop will update to 'processed'
+    graph_ready: false,
+    version: '2.1', // Bump version to indicate raw capture format
   };
 
   zip.file('index.json', JSON.stringify(index, null, 2));
@@ -438,6 +353,44 @@ export async function exportPortableEvidencePackage(
   });
 
   return zipBlob;
+}
+
+/**
+ * Generate a thumbnail from an image data URL
+ */
+async function generateThumbnail(imageData: string, maxWidth: number, maxHeight: number): Promise<string | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      // Calculate dimensions maintaining aspect ratio
+      let width = img.width;
+      let height = img.height;
+
+      if (width > maxWidth) {
+        height = (height * maxWidth) / width;
+        width = maxWidth;
+      }
+      if (height > maxHeight) {
+        width = (width * maxHeight) / height;
+        height = maxHeight;
+      }
+
+      // Create canvas and draw resized image
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(null);
+        return;
+      }
+
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/jpeg', 0.7));
+    };
+    img.onerror = () => resolve(null);
+    img.src = imageData;
+  });
 }
 
 /**

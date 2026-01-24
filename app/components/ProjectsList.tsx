@@ -1,18 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Project, ProjectType } from '../lib/types';
-import { getAllProjects, deleteProject } from '../lib/db';
+import { Project } from '../lib/types';
+import { getAllProjects, deleteProject, getProjectPhotos, updateProject } from '../lib/db';
 import CreateProjectModal from './CreateProjectModal';
-
-// Project type badge configuration
-const PROJECT_TYPE_BADGES: Record<ProjectType, { bg: string; label: string }> = {
-  'phase1-esa': { bg: 'bg-green-600', label: 'Phase I ESA' },
-  'eir-eis': { bg: 'bg-blue-600', label: 'EIR/EIS' },
-  'borehole': { bg: 'bg-orange-600', label: 'Borehole' },
-  'generic': { bg: 'bg-gray-600', label: 'Site Visit' },
-};
+import ProjectCard from './ProjectCard';
+import EmptyState from './EmptyState';
 
 export default function ProjectsList() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -20,6 +14,7 @@ export default function ProjectsList() {
   const [loading, setLoading] = useState(true);
   const [confirmDeleteProject, setConfirmDeleteProject] = useState<string | null>(null);
   const router = useRouter();
+  const thumbnailsGeneratedRef = useRef<Set<string>>(new Set());
 
   const loadProjects = useCallback(async () => {
     try {
@@ -70,6 +65,84 @@ export default function ProjectsList() {
     };
   }, [loadProjects]);
 
+  // Auto-generate thumbnails for projects that have photos but no thumbnail
+  useEffect(() => {
+    const generateMissingThumbnails = async () => {
+      for (const project of projects) {
+        // Skip if already has thumbnail or no photos or already attempted
+        if (project.thumbnail || project.photoCount === 0 || thumbnailsGeneratedRef.current.has(project.id)) {
+          continue;
+        }
+
+        thumbnailsGeneratedRef.current.add(project.id);
+
+        try {
+          const photos = await getProjectPhotos(project.id);
+          if (photos.length > 0) {
+            // Sort by timestamp and get the first photo
+            photos.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+            const firstPhoto = photos[0];
+
+            // Create thumbnail
+            const thumbnail = await createThumbnail(firstPhoto.imageData, 200);
+
+            // Update project
+            const updatedProject = {
+              ...project,
+              thumbnail,
+              thumbnailPhotoId: firstPhoto.id,
+            };
+            await updateProject(updatedProject);
+
+            // Update local state
+            setProjects(prev => prev.map(p => p.id === project.id ? updatedProject : p));
+            console.log('[ProjectsList] Generated thumbnail for project:', project.name);
+          }
+        } catch (error) {
+          console.error('[ProjectsList] Failed to generate thumbnail for project:', project.id, error);
+        }
+      }
+    };
+
+    if (!loading && projects.length > 0) {
+      generateMissingThumbnails();
+    }
+  }, [projects, loading]);
+
+  // Helper to create a smaller thumbnail from base64 image
+  const createThumbnail = (base64Image: string, maxSize: number): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxSize) {
+            height = Math.round((height * maxSize) / width);
+            width = maxSize;
+          }
+        } else {
+          if (height > maxSize) {
+            width = Math.round((width * maxSize) / height);
+            height = maxSize;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        resolve(canvas.toDataURL('image/jpeg', 0.7));
+      };
+      img.onerror = () => resolve(''); // Return empty on error
+      img.src = base64Image;
+    });
+  };
+
   const handleProjectClick = (projectId: string) => {
     router.push(`/project/${projectId}`);
   };
@@ -92,104 +165,63 @@ export default function ProjectsList() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-white p-6">
+    <div className="fixed inset-0 bg-gradient-to-b from-gray-900 to-black text-white overflow-y-scroll" style={{ WebkitOverflowScrolling: 'touch' }}>
       {/* Header */}
-      <div className="max-w-2xl mx-auto mb-8">
-        <h1 className="text-3xl font-bold mb-2">ChoraGraph Capture</h1>
-        <p className="text-gray-400">Field Data Capture Platform</p>
+      <div className="max-w-2xl mx-auto px-6 pt-6 pb-4">
+        <h1 className="text-3xl font-bold mb-1">ChoraGraph Capture</h1>
+        <p className="text-gray-400 text-sm">Environmental Field Evidence</p>
       </div>
 
-      {/* Create New Project Button */}
-      <div className="max-w-2xl mx-auto mb-6">
+      {/* Projects List */}
+      <div className="max-w-2xl mx-auto px-4 space-y-3 pb-28">
+        {loading ? (
+          <div className="text-center text-gray-400 py-8">Loading projects...</div>
+        ) : projects.length === 0 ? (
+          <EmptyState onCreateProject={() => setShowCreateModal(true)} />
+        ) : (
+          projects.map((project) => (
+            <ProjectCard
+              key={project.id}
+              project={project}
+              onClick={() => handleProjectClick(project.id)}
+              onDelete={() => setConfirmDeleteProject(project.id)}
+            />
+          ))
+        )}
+      </div>
+
+      {/* Floating New Project Button - Bottom Center - Liquid Glass Style */}
+      <div className="fixed bottom-6 left-0 right-0 flex justify-center z-40 px-4">
         <button
           onClick={() => {
             console.log('[ProjectsList] New Project button clicked');
             setShowCreateModal(true);
           }}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+          className="group relative px-8 py-4 rounded-full font-semibold transition-all duration-300 ease-out active:scale-95 hover:scale-105"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          New Project
+          {/* Outer glow */}
+          <div className="absolute inset-0 rounded-full bg-emerald-500/20 blur-xl group-hover:bg-emerald-400/30 transition-all duration-300" />
+
+          {/* Glass background with blur */}
+          <div className="absolute inset-0 rounded-full backdrop-blur-xl bg-white/10 border border-white/20 shadow-lg shadow-black/20" />
+
+          {/* Top highlight reflection */}
+          <div className="absolute inset-x-2 top-0.5 h-1/2 rounded-t-full bg-gradient-to-b from-white/25 to-transparent" />
+
+          {/* Inner gradient for depth */}
+          <div className="absolute inset-0 rounded-full bg-gradient-to-b from-emerald-400/30 via-emerald-500/20 to-emerald-600/30" />
+
+          {/* Bottom edge highlight */}
+          <div className="absolute inset-x-4 bottom-1 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+
+          {/* Content */}
+          <span className="relative flex items-center gap-2 text-white drop-shadow-sm">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+            </svg>
+            New Project
+          </span>
         </button>
-      </div>
-
-      {/* Debug: Show modal state */}
-      {showCreateModal && <div className="text-green-400 text-center">Modal should be visible</div>}
-
-      {/* Projects List */}
-      <div className="max-w-2xl mx-auto space-y-3">
-        {loading ? (
-          <div className="text-center text-gray-400 py-8">Loading projects...</div>
-        ) : projects.length === 0 ? (
-          <div className="text-center text-gray-400 py-12">
-            <p className="mb-2">No projects yet</p>
-            <p className="text-sm">Create your first project to get started</p>
-          </div>
-        ) : (
-          projects.map((project) => (
-            <div
-              key={project.id}
-              className="w-full bg-white/10 backdrop-blur-sm rounded-lg p-4 transition-colors hover:bg-white/20 relative"
-            >
-              <button
-                onClick={() => handleProjectClick(project.id)}
-                className="w-full text-left"
-              >
-                <div className="flex justify-between items-start mb-2">
-                  <div className="flex-1 pr-12">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold text-lg">{project.name}</h3>
-                      {/* Project type badge */}
-                      <span className={`text-xs px-2 py-0.5 rounded ${PROJECT_TYPE_BADGES[project.projectType || 'phase1-esa']?.bg || 'bg-gray-600'}`}>
-                        {PROJECT_TYPE_BADGES[project.projectType || 'phase1-esa']?.label || 'Site Visit'}
-                      </span>
-                      {/* Launched badge */}
-                      {project.launchSessionId && (
-                        <span className="text-xs px-2 py-0.5 rounded bg-purple-600">
-                          Launched
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm text-gray-400">Lead: {project.lead}</p>
-                  </div>
-                  <div className="flex gap-4 text-right">
-                    <div>
-                      <div className="text-2xl font-bold text-blue-400">{project.photoCount}</div>
-                      <div className="text-xs text-gray-400">photos</div>
-                    </div>
-                    <div>
-                      <div className="text-2xl font-bold text-green-400">{project.audioCount || 0}</div>
-                      <div className="text-xs text-gray-400">audio</div>
-                    </div>
-                  </div>
-                </div>
-                {project.notes && (
-                  <p className="text-sm text-gray-300 mb-2 line-clamp-2">{project.notes}</p>
-                )}
-                <div className="flex gap-4 text-xs text-gray-500">
-                  <span>Created: {new Date(project.createdAt).toLocaleDateString()}</span>
-                  <span>Modified: {new Date(project.modifiedAt).toLocaleDateString()}</span>
-                </div>
-              </button>
-
-              {/* Delete button - positioned absolutely */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setConfirmDeleteProject(project.id);
-                }}
-                className="absolute top-4 right-4 text-red-400 hover:text-red-300 transition-colors p-2 z-10"
-                aria-label="Delete project"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </button>
-            </div>
-          ))
-        )}
       </div>
 
       {/* Create Project Modal */}
@@ -203,7 +235,7 @@ export default function ProjectsList() {
       {/* Delete Project Confirmation Dialog */}
       {confirmDeleteProject && (
         <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-          <div className="bg-gray-800 rounded-lg p-6 max-w-sm w-full border border-gray-700">
+          <div className="bg-gray-800 rounded-xl p-6 max-w-sm w-full border border-gray-700">
             <h3 className="text-white font-semibold text-lg mb-3">Delete Project?</h3>
             <p className="text-gray-300 text-sm mb-2">
               This will permanently delete the project and all associated photos and audio recordings.
@@ -214,13 +246,13 @@ export default function ProjectsList() {
             <div className="flex gap-3">
               <button
                 onClick={() => setConfirmDeleteProject(null)}
-                className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                className="flex-1 px-4 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-xl transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={() => handleDeleteProject(confirmDeleteProject)}
-                className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors"
+                className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl transition-colors"
               >
                 Delete
               </button>

@@ -1,17 +1,44 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
-import { PhotoAnalysis, GpsCoordinates, PhotoEntity } from '@/app/lib/types';
+import OpenAI from 'openai';
+import { PhotoAnalysis, GpsCoordinates, PhotoEntity, TranscriptSegment } from '@/app/lib/types';
+
+type VisionProvider = 'claude' | 'openai';
+type VisionModel = 'claude-sonnet-4-5-20250929' | 'gpt-4o-mini' | 'gpt-4o';
 
 // ESA-specific prompt for comprehensive photo analysis
-function buildAnalysisPrompt(gps: GpsCoordinates | null, timestamp: string, sessionTimestamp: number): string {
+// Now includes transcript context for intelligent analysis
+function buildAnalysisPrompt(
+  gps: GpsCoordinates | null,
+  timestamp: string,
+  sessionTimestamp: number,
+  transcriptContext: TranscriptSegment | null
+): string {
   const gpsText = gps
     ? `[GPS coordinates: ${gps.latitude.toFixed(6)}, ${gps.longitude.toFixed(6)} ±${Math.round(gps.accuracy)}m]`
     : '[GPS coordinates: Not available]';
 
+  // Build transcript context section
+  let transcriptSection = '';
+  if (transcriptContext) {
+    transcriptSection = `
+## CONSULTANT'S VERBAL CONTEXT
+The field consultant said the following while taking this photo:
+"${transcriptContext.text}"
+
+**IMPORTANT**: Use this verbal context to:
+1. **Answer questions**: If the consultant asks "What is this?" or "I wonder if...", try to answer based on what you see
+2. **Extract action items**: If they say "add to to-do" or "need to check later", create an ActionItem entity
+3. **Note their observations**: If they share context like "the site manager said..." or "this used to be...", incorporate it
+4. **Validate hypotheses**: If they say "this looks like a UST" or "might be contamination", confirm or challenge based on visual evidence
+5. **Flag uncertainties**: If they express uncertainty, note it and provide your assessment
+`;
+  }
+
   return `You are assisting a Phase I Environmental Site Assessment (ESA) per ASTM E1527-21 standard.
 
 Your role: Analyze site photographs to identify environmental conditions, potential contamination sources, and regulatory compliance issues. Focus on features that could indicate current or historical environmental impacts.
-
+${transcriptSection}
 Analyze this photograph and provide:
 
 1. VISUAL DESCRIPTION (2-4 sentences)
@@ -19,6 +46,7 @@ Analyze this photograph and provide:
    - Note relevant environmental observations (staining, deterioration, storage practices)
    - Identify any potential Recognized Environmental Conditions (RECs) or Areas of Concern (AOCs)
    - Include context from GPS if provided (e.g., "exterior northeast corner" vs "interior space")
+   ${transcriptContext ? '- Address any questions or observations from the consultant\'s verbal context' : ''}
 
 2. CATALOG TAGS (searchable keywords - comprehensive list)
    Include ALL relevant tags from these categories:
@@ -42,13 +70,24 @@ Analyze this photograph and provide:
    **Signage & Safety:** hazmat_placard, nfpa_diamond, safety_signage, warning_label, no_trespassing
 
    **Risk Flags:** potential_rec, potential_aoc, hazmat_concern, requires_sampling, compliance_issue, historical_use_indicator
+   ${transcriptContext ? '\n   **Transcript-derived:** action_item, question_raised, consultant_observation, needs_verification' : ''}
 
 3. EXTRACTED ENTITIES (structured findings - be comprehensive)
    For each significant observation, create an entity with:
-   - type: "REC" | "AOC" | "Feature" | "Equipment" | "Condition"
+   - type: One of:
+     - "REC" - Recognized Environmental Condition
+     - "AOC" - Area of Concern
+     - "Feature" - Site feature
+     - "Equipment" - Equipment/machinery
+     - "Condition" - Observable condition
+     ${transcriptContext ? `- "ActionItem" - Something the consultant wants to follow up on
+     - "Question" - A question the consultant asked (include your answer)
+     - "Observation" - Consultant's verbal observation worth noting` : ''}
    - description: Detailed description with measurements/specifics when possible
    - severity: "high" | "medium" | "low" | "info"
    - recommendation: Follow-up action if applicable (sampling, further investigation, etc.)
+   ${transcriptContext ? `- consultantContext: (optional) Quote what the consultant said that relates to this entity
+   - aiResponse: (optional) Your answer if responding to a question` : ''}
 
    **Severity Guidelines:**
    - high: Confirmed or highly likely REC (active leaking, extensive staining, hazmat storage issues)
@@ -62,6 +101,7 @@ CRITICAL: Be thorough and comprehensive. Tag everything visible that could be re
 - Potential contamination sources
 - Future investigation needs
 - Report completeness
+${transcriptContext ? '- Consultant questions and to-do items' : ''}
 
 ${gpsText}
 [Photo timestamp: ${timestamp}]
@@ -73,13 +113,103 @@ Respond ONLY with valid JSON in this exact structure:
   "catalogTags": ["string"],
   "entities": [
     {
-      "type": "REC" | "AOC" | "Feature" | "Equipment" | "Condition",
+      "type": "REC" | "AOC" | "Feature" | "Equipment" | "Condition"${transcriptContext ? ' | "ActionItem" | "Question" | "Observation"' : ''},
       "description": "string",
       "severity": "high" | "medium" | "low" | "info",
-      "recommendation": "string or null"
+      "recommendation": "string or null"${transcriptContext ? `,
+      "consultantContext": "string or null",
+      "aiResponse": "string or null"` : ''}
     }
   ]
 }`;
+}
+
+// Call OpenAI GPT-4o-mini for vision analysis
+async function analyzeWithOpenAI(
+  model: 'gpt-4o-mini' | 'gpt-4o',
+  base64Data: string,
+  mediaType: string,
+  promptText: string
+): Promise<{ text: string; inputTokens: number; outputTokens: number }> {
+  const apiKey = process.env.OPENAI_API_KEY;
+
+  if (!apiKey) {
+    throw new Error('OPENAI_API_KEY not configured');
+  }
+
+  const openai = new OpenAI({ apiKey });
+
+  const response = await openai.chat.completions.create({
+    model,
+    max_tokens: 2048,
+    messages: [{
+      role: 'user',
+      content: [
+        {
+          type: 'image_url',
+          image_url: {
+            url: `data:image/${mediaType};base64,${base64Data}`,
+            detail: 'high'
+          }
+        },
+        {
+          type: 'text',
+          text: promptText
+        }
+      ]
+    }]
+  });
+
+  return {
+    text: response.choices[0]?.message?.content || '',
+    inputTokens: response.usage?.prompt_tokens || 0,
+    outputTokens: response.usage?.completion_tokens || 0
+  };
+}
+
+// Call Claude for vision analysis
+async function analyzeWithClaude(
+  base64Data: string,
+  mediaType: string,
+  promptText: string
+): Promise<{ text: string; inputTokens: number; outputTokens: number }> {
+  const apiKey = process.env.CLAUDE_API_KEY;
+
+  if (!apiKey) {
+    throw new Error('CLAUDE_API_KEY not configured');
+  }
+
+  const anthropic = new Anthropic({ apiKey });
+
+  const response = await anthropic.messages.create({
+    model: 'claude-sonnet-4-5-20250929',
+    max_tokens: 2048,
+    messages: [{
+      role: 'user',
+      content: [
+        {
+          type: 'image',
+          source: {
+            type: 'base64',
+            media_type: `image/${mediaType}` as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
+            data: base64Data
+          }
+        },
+        {
+          type: 'text',
+          text: promptText
+        }
+      ]
+    }]
+  });
+
+  const textContent = response.content.find(block => block.type === 'text');
+
+  return {
+    text: textContent?.type === 'text' ? textContent.text : '',
+    inputTokens: response.usage.input_tokens,
+    outputTokens: response.usage.output_tokens
+  };
 }
 
 export async function POST(req: NextRequest) {
@@ -88,7 +218,7 @@ export async function POST(req: NextRequest) {
 
     // Parse request body
     const body = await req.json();
-    const { photoId, imageData, gps, timestamp, sessionTimestamp } = body;
+    const { photoId, imageData, gps, timestamp, sessionTimestamp, transcriptSegment, provider = 'openai', model = 'gpt-4o-mini' } = body;
 
     // Validation
     if (!photoId || typeof photoId !== 'string') {
@@ -127,63 +257,46 @@ export async function POST(req: NextRequest) {
     console.log(`[AnalyzePhoto] Processing photo ${photoId}`);
     console.log(`[AnalyzePhoto] Image format: ${mediaType}, size: ${Math.round(base64Data.length / 1024)}KB`);
     console.log(`[AnalyzePhoto] GPS: ${gps ? 'available' : 'not available'}`);
+    console.log(`[AnalyzePhoto] Transcript context: ${transcriptSegment ? `"${transcriptSegment.text.substring(0, 50)}..."` : 'none'}`);
 
-    // Build ESA-specific prompt
-    const promptText = buildAnalysisPrompt(gps, timestamp, sessionTimestamp || 0);
+    // Build ESA-specific prompt with transcript context
+    const promptText = buildAnalysisPrompt(
+      gps,
+      timestamp,
+      sessionTimestamp || 0,
+      transcriptSegment || null
+    );
 
-    // Check for API key (using CLAUDE_API_KEY to avoid Anthropic SDK override)
-    const apiKey = process.env.CLAUDE_API_KEY;
+    // Call the appropriate vision API based on provider
+    console.log(`[AnalyzePhoto] Using provider: ${provider}, model: ${model}`);
 
-    if (!apiKey || apiKey.length === 0) {
-      console.error('[AnalyzePhoto] CLAUDE_API_KEY not found or empty in environment');
-      return NextResponse.json(
-        { error: 'Anthropic API key not configured. Please add CLAUDE_API_KEY to .env.local' },
-        { status: 500 }
-      );
+    let responseText: string;
+    let inputTokens: number;
+    let outputTokens: number;
+
+    if (provider === 'claude') {
+      const result = await analyzeWithClaude(base64Data, mediaType, promptText);
+      responseText = result.text;
+      inputTokens = result.inputTokens;
+      outputTokens = result.outputTokens;
+    } else {
+      // Default to OpenAI
+      const openaiModel = model === 'gpt-4o' ? 'gpt-4o' : 'gpt-4o-mini';
+      const result = await analyzeWithOpenAI(openaiModel, base64Data, mediaType, promptText);
+      responseText = result.text;
+      inputTokens = result.inputTokens;
+      outputTokens = result.outputTokens;
     }
 
-    console.log('[AnalyzePhoto] API key loaded successfully');
-
-    // Initialize Anthropic client
-    const anthropic = new Anthropic({
-      apiKey: apiKey
-    });
-
-    // Call Claude Vision API
-    console.log('[AnalyzePhoto] Calling Claude Vision API...');
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5-20250929',
-      max_tokens: 2048,
-      messages: [{
-        role: 'user',
-        content: [
-          {
-            type: 'image',
-            source: {
-              type: 'base64',
-              media_type: `image/${mediaType}` as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
-              data: base64Data
-            }
-          },
-          {
-            type: 'text',
-            text: promptText
-          }
-        ]
-      }]
-    });
-
-    console.log('[AnalyzePhoto] Claude response received');
+    console.log(`[AnalyzePhoto] Response received from ${provider}`);
     console.log('[AnalyzePhoto] Token usage:', {
-      input_tokens: response.usage.input_tokens,
-      output_tokens: response.usage.output_tokens,
-      total_tokens: response.usage.input_tokens + response.usage.output_tokens
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+      total_tokens: inputTokens + outputTokens
     });
 
-    // Extract text content from response
-    const textContent = response.content.find(block => block.type === 'text');
-    if (!textContent || textContent.type !== 'text') {
-      throw new Error('No text content in Claude response');
+    if (!responseText) {
+      throw new Error(`No text content in ${provider} response`);
     }
 
     // Parse JSON response
@@ -195,19 +308,19 @@ export async function POST(req: NextRequest) {
 
     try {
       // Try to extract JSON from markdown code blocks if present
-      const jsonMatch = textContent.text.match(/```json\n([\s\S]*?)\n```/) ||
-                       textContent.text.match(/```\n([\s\S]*?)\n```/);
+      const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/) ||
+                       responseText.match(/```\n([\s\S]*?)\n```/);
 
-      const jsonText = jsonMatch ? jsonMatch[1] : textContent.text;
+      const jsonText = jsonMatch ? jsonMatch[1] : responseText;
       parsedResponse = JSON.parse(jsonText);
     } catch (parseError) {
-      console.error('[AnalyzePhoto] Failed to parse Claude response:', textContent.text);
-      throw new Error('Claude returned invalid JSON format');
+      console.error(`[AnalyzePhoto] Failed to parse ${provider} response:`, responseText);
+      throw new Error(`${provider} returned invalid JSON format`);
     }
 
     // Validate response structure
     if (!parsedResponse.description || !Array.isArray(parsedResponse.catalogTags) || !Array.isArray(parsedResponse.entities)) {
-      throw new Error('Claude response missing required fields');
+      throw new Error(`${provider} response missing required fields`);
     }
 
     // Construct PhotoAnalysis object
@@ -218,10 +331,21 @@ export async function POST(req: NextRequest) {
       entities: parsedResponse.entities,
       timestamp,
       gps: gps || null,
-      transcriptSegment: null  // Phase 3 - timestamp correlation
+      // Store the transcript segment that was used for context
+      transcriptSegment: transcriptSegment || null
     };
 
     console.log(`[AnalyzePhoto] Success - Generated ${analysis.catalogTags.length} tags and ${analysis.entities.length} entities`);
+
+    // Log if we found action items or questions
+    const actionItems = analysis.entities.filter(e => e.type === 'ActionItem');
+    const questions = analysis.entities.filter(e => e.type === 'Question');
+    if (actionItems.length > 0) {
+      console.log(`[AnalyzePhoto] Found ${actionItems.length} action item(s)`);
+    }
+    if (questions.length > 0) {
+      console.log(`[AnalyzePhoto] Answered ${questions.length} question(s)`);
+    }
 
     return NextResponse.json({ analysis });
 

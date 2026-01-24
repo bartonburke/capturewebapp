@@ -1,10 +1,11 @@
 # ChoraGraph Capture — Product Requirements Document
 
-**Version:** 0.3 (Prototype)  
-**Date:** January 9, 2026  
-**Author:** Bart Burke + Claude  
+**Version:** 1.0 (Working Prototype)
+**Date:** January 16, 2026
+**Author:** Bart Burke + Claude
 
 > **See also:** [VISION.md](./VISION.md) for the broader ChoraGraph platform vision
+> **See also:** [CLAUDE.md](./CLAUDE.md) for development context and implementation details
 
 ---
 
@@ -17,7 +18,7 @@ ChoraGraph is a spatial interface layer for work done in the real world. It has 
 | **Capture** | Camera | Collect evidence in the field — photos, audio, observations anchored to location |
 | **View** | Map | See, navigate, and act on spatial data — browse captured content, deep link to other apps |
 
-**This prototype builds Capture mode.**
+**This prototype implements Capture mode** with AI-powered processing.
 
 ---
 
@@ -41,9 +42,10 @@ This prototype demonstrates the core concept of **building a spatial knowledge g
 
 ## 4. Target User
 
-**Primary:** Environmental consultants conducting Phase 1 ESA site visits  
-**Context:** Walking a property, phone in hand, capturing evidence and observations on the go  
-**Device:** iPhone with Safari  
+**Primary:** Environmental consultants conducting Phase 1 ESA site visits
+**Secondary:** EIR/EIS specialists, borehole logging technicians, general site inspectors
+**Context:** Walking a property, phone in hand, capturing evidence and observations on the go
+**Device:** iPhone with Safari
 
 ---
 
@@ -70,16 +72,16 @@ Audio recording runs continuously throughout the site visit. Post-session:
 
 ### 5.3 Workflow-Specific Schema
 
-The data schema is shaped by the job to be done. For Phase 1 ESA, relevant entity types include:
+The data schema is shaped by the job to be done. The app supports multiple project types:
 
-- **RECs** (Recognized Environmental Conditions)
-- **Site Features:** ASTs, USTs, storm drains, floor drains, sumps, staining, drums/containers
-- **Structures:** Buildings, loading docks, maintenance areas
-- **Interviews:** Facility manager statements, tenant observations
-- **Historical Indicators:** Evidence of past use, fill material, former structures
-- **Regulatory:** Permits observed, signage, placards
+| Project Type | Use Case | Entity Focus |
+|--------------|----------|--------------|
+| **Phase I ESA** | Environmental site assessments | RECs, USTs, ASTs, staining, regulatory |
+| **EIR/EIS** | Environmental impact reports | Habitat, species, land use, mitigation |
+| **Borehole** | Subsurface investigation logging | Soil types, water levels, stratigraphy |
+| **Generic** | General site documentation | Flexible entity schema |
 
-The architecture supports swapping schemas for different workflows (e.g., construction inspection) without changing the capture flow.
+The architecture supports swapping schemas for different workflows without changing the capture flow.
 
 ### 5.4 Spatial Agents (Conceptual)
 
@@ -96,37 +98,63 @@ For the prototype, the "agent" is Claude with ESA context + access to the photo 
 
 ---
 
-## 6. MVP Feature Set (Prototype Scope)
+## 6. Current Feature Set (Implemented)
 
-### 6.1 Capture Mode
+### 6.1 Projects Management
+
+| Feature | Description | Status |
+|---------|-------------|--------|
+| **Projects list** | Home screen showing all projects with metadata | ✅ Implemented |
+| **Create project** | Modal with name, lead, notes, project type selection | ✅ Implemented |
+| **Project types** | Phase I ESA, EIR/EIS, Borehole, Generic with badges | ✅ Implemented |
+| **Delete project** | Cascading delete of project + photos + audio | ✅ Implemented |
+| **Resume capture** | Continue capturing on existing project | ✅ Implemented |
+
+### 6.2 Capture Mode
 
 #### Session Header (Always Visible During Capture)
 | Element | Description |
 |---------|-------------|
-| **Agent label** | "ESA Capture Agent" (simple text) |
-| **Session status** | Recording / Paused |
-| **Duration** | Elapsed time since session start |
+| **Back button** | Return to projects list |
+| **Project name** | Current project title |
+| **Session status** | Recording / Paused indicator with colored dot |
+| **Duration** | Elapsed time (HH:MM:SS format) |
 | **Photo count** | Number of photos captured this session |
+| **GPS status** | Acquiring/Active/Error with accuracy (±Xm) |
+| **Audio indicator** | Red pulsing dot when recording audio |
+| **Capture prompts** | Rotating contextual tips (10-second intervals) |
 
 #### Live View
 - Rear camera preview (full screen behind controls)
 - Recording indicator (red dot/pulse when audio is live)
+- Flash overlay feedback on photo capture
 
 #### Controls & States
+
+**NOT_STARTED STATE:**
+| Control | Action |
+|---------|--------|
+| **Start Session** | Begin recording → initialize camera, audio, GPS |
 
 **RECORDING STATE:**
 | Control | Action |
 |---------|--------|
-| **📷 Capture** | Take photo (GPS + timestamp attached) |
-| **⏸️ Pause** | Pause audio recording, stay in session |
-| **⏹️ End** | End session → prompt for project name → upload |
+| **📷 Capture** | Take photo (GPS + timestamp attached, saved to IndexedDB) |
+| **Pause** | Pause audio recording, stay in session |
+| **End Session** | End session → save audio → show summary |
 
 **PAUSED STATE:**
 | Control | Action |
 |---------|--------|
 | **📷 Capture** | **DISABLED** (grayed out, cannot take photos while paused) |
-| **▶️ Resume** | Resume audio recording, re-enable capture |
-| **⏹️ End** | End session → prompt for project name → upload |
+| **Resume** | Resume audio recording, re-enable capture |
+| **End Session** | End session → save audio → show summary |
+
+**ENDED STATE:**
+| Control | Action |
+|---------|--------|
+| **Back to Projects** | Return to projects list |
+| **New Session** | Start another capture session |
 
 #### Session Flow
 ```
@@ -136,194 +164,288 @@ For the prototype, the "agent" is Claude with ESA context + access to the photo 
                                   │
                                   ▼
                       ┌─────────────────────┐
-                      │ Enter project name  │
-                      │ Confirm upload      │
-                      └─────────────────────┘
-                                  │
-                                  ▼
-                      ┌─────────────────────┐
-                      │ Upload & Processing │
+                      │ Session Complete    │
+                      │ Summary displayed   │
                       └─────────────────────┘
 ```
 
-#### Key Behaviors
-- **No upfront project name** — session starts immediately
-- **Project name entered at end** — before upload begins
-- **Pause = no photos** — must resume to capture
-- **GPS captured per photo** — standard device GPS
+### 6.3 Project Review Interface
 
-### 6.2 Post-Session Processing
+| Feature | Description | Status |
+|---------|-------------|--------|
+| **Photo gallery** | 2-column grid of captured photos | ✅ Implemented |
+| **GPS on thumbnails** | Coordinates visible on each photo | ✅ Implemented |
+| **Fullscreen view** | Tap to expand photo | ✅ Implemented |
+| **Swipe navigation** | Touch gestures between photos | ✅ Implemented |
+| **Arrow navigation** | Button navigation in fullscreen | ✅ Implemented |
+| **Audio playback** | Native audio player for recordings | ✅ Implemented |
+| **Delete photos** | Remove individual photos | ✅ Implemented |
+| **Delete audio** | Remove audio recordings | ✅ Implemented |
 
-| Feature | Description |
-|---------|-------------|
-| **Audio transcription** | Full session audio → text via Whisper API |
-| **Transcript analysis** | Claude extracts ESA entities from transcript |
-| **Photo analysis** | Claude Vision describes each image, identifies ESA-relevant features |
-| **Timestamp correlation** | Link transcript segments to photos based on capture time |
-| **Structured output** | Graph-ready JSON with all nodes and relationships |
+### 6.4 AI Processing Pipeline
 
-### 6.3 Review Interface
+| Phase | Feature | Technology | Status |
+|-------|---------|------------|--------|
+| **Phase 1** | Audio transcription | OpenAI Whisper API | ✅ Implemented |
+| **Phase 2** | Photo analysis | Claude Vision API | 🚧 In Progress |
+| **Phase 3** | Timestamp correlation | Client-side matching | 📋 Planned |
+| **Phase 4** | Entity extraction | Claude API | 📋 Planned |
 
-| Feature | Description |
-|---------|-------------|
-| **Photo gallery** | Scroll through captured photos |
-| **Per-photo detail** | View: image, GPS, timestamp, transcript context, VLM description, extracted tags |
-| **Session summary** | List of extracted RECs, site features, observations |
-| **Export** | Download structured JSON |
+#### Phase 1: Transcription (Implemented)
+- Purple "Process" button on unprocessed audio
+- Animated progress modal during processing
+- Transcript display with full text, segments, language detection
+- Green "Processed" badge after completion
+- Results persisted in IndexedDB
 
-### 6.4 On-Device Computer Vision (Demo Feature)
+### 6.5 Export & Integration
 
-Lightweight CV running during capture to demonstrate smart detection.
+| Feature | Description | Status |
+|---------|-------------|--------|
+| **Portable Evidence Package v2.0** | Structured zip export | ✅ Implemented |
+| **SESSION_SUMMARY.md** | Human/Claude-readable summary | ✅ Implemented |
+| **Auto-import** | Sync to `evidence/sessions/` directory | ✅ Implemented |
+| **Launch API** | `/api/v1/capture/launch` for external session creation | ✅ Implemented |
+| **Import API** | `/api/v1/capture/import` for receiving packages | ✅ Implemented |
 
-**Prototype scope:**
-- **Object:** Drainage grate
-- **Detection type:** Presence only (no bounding box or localization)
-- **Behavior:** When detected, tag is auto-added to the photo
-- **Future:** Additional objects (ASTs, drums, signage, etc.)
+#### Export Structure (Portable Evidence Package v2.0)
+```
+site-visit-YYYY-MM-DD-{name}-{uuid}/
+├── index.json              # Complete metadata
+├── SESSION_SUMMARY.md      # Human/Claude readable summary
+├── session-audio.webm      # Audio recording
+├── transcript.txt          # Plain text transcript
+└── photos/
+    ├── 001-contextual-name.jpg
+    ├── 002-another-photo.jpg
+    └── ...
+```
 
-Implementation: Core ML model or TensorFlow.js for Safari.
+### 6.6 Launch API
 
----
+External systems (like Claude Code) can create capture sessions:
 
-## 7. Out of Scope (Future)
-
-- Integration with Compass: Engine / Neo4j
-- VPS / Visual SLAM for precise positioning
-- Real-time transcription during capture
-- Multi-user / team features
-- Persistent spatial agents (AR cloud style)
-- Android support
-- Offline-first with sync
-- Report generation (ChoraGraph agents)
-
----
-
-## 8. Technical Approach
-
-### 8.1 Stack
-
-| Layer | Technology |
-|-------|------------|
-| **Framework** | Next.js (React) |
-| **Styling** | Tailwind CSS |
-| **Hosting** | Vercel (serverless functions for API routes) |
-| **Platform** | Safari on iOS only (mobile-optimized PWA) |
-| **Camera/Audio** | MediaDevices API (getUserMedia) |
-| **GPS** | Geolocation API |
-| **Local Storage** | IndexedDB for session data |
-| **Transcription** | Whisper API (OpenAI) |
-| **AI Processing** | Claude API (transcript analysis, vision) |
-| **On-device CV** | TensorFlow.js or server-side Claude Vision (TBD) |
-| **Output** | JSON (graph-ready structure) |
-
-### 8.2 Data Model (Simplified)
-
-```json
+```typescript
+// POST /api/v1/capture/launch
 {
-  "session": {
-    "id": "uuid",
-    "siteName": "Example Property",
-    "startTime": "ISO8601",
-    "endTime": "ISO8601",
-    "gpsStart": { "lat": 0.0, "lng": 0.0 }
-  },
-  "audio": {
-    "fileUri": "path/to/audio.mp3",
-    "transcript": "Full transcript text...",
-    "segments": [
-      { "start": 0, "end": 15, "text": "Starting at the main entrance..." }
-    ]
-  },
-  "photos": [
-    {
-      "id": "uuid",
-      "timestamp": "ISO8601",
-      "gps": { "lat": 0.0, "lng": 0.0 },
-      "imageUri": "path/to/photo.jpg",
-      "transcriptSegment": { "start": 45, "end": 60 },
-      "vlmDescription": "Image shows a concrete pad with visible staining...",
-      "extractedEntities": [
-        { "type": "REC", "label": "Potential REC - surface staining", "confidence": 0.85 },
-        { "type": "SiteFeature", "label": "Concrete pad", "confidence": 0.95 }
-      ],
-      "tags": ["staining", "concrete", "north-side"]
-    }
-  ],
-  "extractedEntities": [
-    { "type": "REC", "label": "...", "sourcePhotoId": "uuid", "transcriptRef": { "start": 45, "end": 60 } }
-  ]
+  projectId?: string,           // External project ID
+  projectType: 'phase1-esa' | 'eir-eis' | 'borehole' | 'generic',
+  projectName: string,
+  lead?: string,
+  notes?: string,
+  context?: Partial<ProjectContext>,
+  expiresAt?: string            // ISO8601, defaults to 24 hours
+}
+
+// Response
+{
+  sessionId: string,            // UUID for capture session
+  captureUrl: string,           // Full URL to open on mobile
+  expiresAt: string             // ISO8601
 }
 ```
 
-### 8.3 Processing Flow
+---
 
+## 7. Technical Stack
+
+### 7.1 Core Technologies
+
+| Layer | Technology |
+|-------|------------|
+| **Framework** | Next.js 16 (App Router) + React 19 |
+| **Language** | TypeScript |
+| **Styling** | Tailwind CSS 4 |
+| **Hosting** | Vercel (serverless functions for API routes) |
+| **Platform** | Safari on iOS (mobile-optimized PWA) |
+| **Camera/Audio** | MediaDevices API (getUserMedia) |
+| **GPS** | Geolocation API |
+| **Local Storage** | IndexedDB (browser-based persistence) |
+| **Transcription** | OpenAI Whisper API |
+| **AI Processing** | Anthropic Claude API (Vision + Analysis) |
+| **Export** | JSZip for package generation |
+
+### 7.2 Data Model
+
+#### Core Types
+```typescript
+interface Project {
+  id: string;              // UUID
+  name: string;            // e.g., "123 Main St ESA"
+  lead: string;            // Project lead name
+  notes?: string;          // Optional notes
+  createdAt: string;       // ISO8601
+  modifiedAt: string;      // ISO8601
+  photoCount: number;      // Total photos
+  audioCount: number;      // Total audio recordings
+  projectType: ProjectType;           // phase1-esa, eir-eis, borehole, generic
+  externalProjectId?: string;         // ID from launching system
+  launchSessionId?: string;           // Session ID if launched via API
+  context?: ProjectContext;           // Dynamic context from launch
+  processingStage?: ProcessingStage;  // captured, transcribed, analyzed, graph_ready
+}
+
+interface PhotoMetadata {
+  id: string;
+  timestamp: string;
+  projectId: string;
+  gps: GpsCoordinates | null;
+  imageData: string;       // Base64 encoded JPEG
+  sessionTimestamp: number;
+}
+
+interface AudioMetadata {
+  id: string;
+  projectId: string;
+  sessionId: string;
+  audioData: string;       // Base64 encoded audio
+  duration: number;
+  mimeType: string;
+  timestamp: string;
+  fileSize: number;
+}
 ```
-[Capture Session]
-       │
-       ▼
-┌─────────────────┐
-│ Audio + Photos  │
-│ GPS + Timestamps│
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  Upload Audio   │──────► Whisper API ──────► Transcript
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ For each photo: │
-│  - Send to VLM  │──────► Claude Vision ──────► Description
-│  - Match transcript segment by timestamp       
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────────────┐
-│ Claude: Extract ESA     │
-│ entities from transcript│──────► Structured entities
-│ + VLM descriptions      │
-└────────┬────────────────┘
-         │
-         ▼
-┌─────────────────┐
-│ Graph-ready JSON│
-└─────────────────┘
+
+#### Processing Types
+```typescript
+interface ProcessingResult {
+  id: string;
+  projectId: string;
+  sessionId: string;
+  createdAt: string;
+  status: 'processing' | 'completed' | 'failed';
+  error?: string;
+  transcript: Transcript;
+  photoAnalyses: PhotoAnalysis[];
+  entities: ExtractedEntity[];
+}
+
+interface Transcript {
+  fullText: string;
+  segments: TranscriptSegment[];
+  language?: string;
+  duration: number;
+}
+
+interface PhotoAnalysis {
+  photoId: string;
+  vlmDescription: string;
+  catalogTags: string[];
+  entities: PhotoEntity[];
+  transcriptSegment: TranscriptSegment | null;
+}
+```
+
+### 7.3 IndexedDB Schema
+
+Database: `choragraph-capture` (version 4)
+
+| Store | KeyPath | Indexes |
+|-------|---------|---------|
+| **projects** | `id` | `modifiedAt` |
+| **photos** | `id` | `projectId`, `timestamp` |
+| **audio** | `id` | `projectId`, `sessionId`, `timestamp` |
+| **processing_results** | `id` | `projectId`, `sessionId`, `status` |
+
+### 7.4 File Structure
+```
+app/
+├── api/
+│   ├── transcribe-audio/
+│   │   └── route.ts             # Whisper API endpoint
+│   ├── analyze-photo/
+│   │   └── route.ts             # Claude Vision endpoint
+│   └── v1/capture/
+│       ├── launch/
+│       │   └── route.ts         # External session creation
+│       └── import/
+│           └── route.ts         # Package import
+├── lib/
+│   ├── types.ts                 # TypeScript interfaces
+│   ├── db.ts                    # IndexedDB utilities
+│   ├── export.ts                # Export utilities
+│   └── defaultContexts.ts       # Default entity schemas
+├── components/
+│   ├── CaptureInterface.tsx     # Camera/audio capture UI
+│   ├── ProjectsList.tsx         # Projects home screen
+│   ├── CreateProjectModal.tsx   # Create project form
+│   └── MobileConsole.tsx        # Debug console
+├── capture/[projectId]/
+│   └── page.tsx                 # Capture interface route
+├── project/[projectId]/
+│   └── page.tsx                 # Project review route
+├── session/[sessionId]/
+│   └── page.tsx                 # External launch handler
+├── import/
+│   └── page.tsx                 # Import handling
+├── globals.css                  # iOS-optimized styles
+├── layout.tsx                   # Root layout with PWA meta
+└── page.tsx                     # Home (ProjectsList)
+
+evidence/
+└── sessions/                    # Imported field sessions
+    └── {sessionId}/
+        ├── index.json
+        ├── SESSION_SUMMARY.md
+        ├── session-audio.webm
+        ├── transcript.txt
+        └── photos/
+
+public/
+├── manifest.json                # PWA configuration
+└── icon.svg                     # App icon
 ```
 
 ---
 
-## 9. Success Criteria (Prototype)
+## 8. Planned Features (Future)
+
+| Feature | Priority | Notes |
+|---------|----------|-------|
+| **Phase 2: Photo analysis** | High | Claude Vision for ESA-specific descriptions |
+| **Phase 3: Timestamp correlation** | High | Match photos to transcript segments |
+| **Phase 4: Entity extraction** | High | Extract RECs, site features, observations |
+| **On-device CV demo** | Medium | Real-time object detection (drainage grates) |
+| **Share/download individual photos** | Medium | Quick sharing from review |
+| **Offline-first with sync** | Low | Full offline support |
+| **Real-time transcription** | Low | Live transcription during capture |
+| **Android support** | Low | Cross-platform PWA |
+| **Report generation** | Future | ChoraGraph agents for draft reports |
+
+---
+
+## 9. Success Criteria
 
 1. **Capture works smoothly:** User can record audio, take photos, and see GPS attached—no crashes, no lost data
 2. **Post-processing produces structured output:** Transcript, VLM descriptions, extracted entities all present in JSON
 3. **Photo-transcript correlation is accurate:** Transcript segments match what was being said when each photo was taken
 4. **ESA entities are extracted:** RECs, site features, observations appear in output with reasonable accuracy
 5. **Demo is compelling:** Non-technical stakeholder can see the value of "mobile capture → spatial knowledge graph"
+6. **Integration works:** External systems can launch sessions and receive processed packages
 
 ---
 
-## 10. Open Questions
+## 10. Known Issues & Limitations
 
-- [x] ~~Which object should on-device CV detect?~~ → **Drainage grate** (presence only, more objects later)
-- [ ] Whisper API vs. alternative transcription service?
-- [x] ~~How to handle long sessions (>30 min audio)?~~ → **Ignore for prototype**
-- [x] ~~Should review interface allow editing extracted entities?~~ → **Ignore for prototype**
-- [x] ~~Branding~~ → **ChoraGraph Capture**
-
----
-
-## 11. Next Steps
-
-1. **Finalize PRD** — review and adjust with Bart
-2. **Set up Claude Code project** — clone repo, configure environment
-3. **Build capture UI** — camera, audio, photo button, GPS
-4. **Implement local storage** — IndexedDB for session persistence
-5. **Build post-processing pipeline** — Whisper + Claude integrations
-6. **Build review interface** — gallery, detail view, export
-7. **Add on-device CV demo** — TBD object detection
-8. **Test on iPhone Safari** — validate full flow
+1. **Camera & GPS Permissions**: Require HTTPS on iOS. Use ngrok for local dev.
+2. **Node Version**: Requires Node 20.9.0+ (Next.js 16 requirement)
+3. **Base64 Storage**: Photos and audio stored as base64 - may impact performance with large projects
+4. **Private Browsing**: IndexedDB unavailable in Safari private mode
+5. **Long Sessions**: Sessions >30 minutes not optimized (audio chunking TBD)
 
 ---
 
-*This document is a working draft for prototype development. It will evolve as we build.*
+## 11. Development History
+
+| Date | Milestone |
+|------|-----------|
+| Jan 9, 2026 | Initial prototype with camera, GPS, photo capture |
+| Jan 9, 2026 | Audio recording with pause/resume lifecycle |
+| Jan 9, 2026 | Project review page with photo gallery |
+| Jan 10, 2026 | Swipe navigation, GPS on thumbnails |
+| Jan 11, 2026 | Phase 1 AI Transcription (Whisper API) |
+| Jan 15, 2026 | Multi-project types, Launch API, Portable Evidence Package v2.0 |
+
+---
+
+*This document reflects the current state of the working prototype. See CLAUDE.md for detailed implementation notes and development context.*

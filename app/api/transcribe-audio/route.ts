@@ -181,3 +181,12 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+// Allow large audio files (up to 250MB base64 encoded)
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '250mb',
+    },
+  },
+};
