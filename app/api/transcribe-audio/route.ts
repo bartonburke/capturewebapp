@@ -1,11 +1,9 @@
 // API Route: Transcribe Audio with OpenAI Whisper
 // Receives base64 audio, converts to file, transcribes, returns structured transcript
+// Works in Vercel serverless environment using toFile helper (no filesystem access needed)
 
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
-import fs from 'fs';
-import path from 'path';
-import { execSync } from 'child_process';
+import OpenAI, { toFile } from 'openai';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -69,74 +67,41 @@ export async function POST(req: NextRequest) {
     const fileSizeMB = buffer.length / (1024 * 1024);
     console.log(`[Transcribe] Received ${fileSizeMB.toFixed(2)}MB audio file`);
 
+    // Check if file is too large for Whisper (25MB limit)
+    if (fileSizeMB > 25) {
+      return NextResponse.json(
+        { error: `Audio file too large: ${fileSizeMB.toFixed(2)}MB (max 25MB). Try a shorter recording.` },
+        { status: 413 }
+      );
+    }
+
     // Determine file extension from MIME type
     const extensionMap: Record<string, string> = {
       'audio/webm': 'webm',
+      'audio/webm;codecs=opus': 'webm',
       'audio/mp4': 'mp4',
       'audio/mpeg': 'mp3',
       'audio/wav': 'wav',
       'audio/m4a': 'm4a',
     };
-    const extension = extensionMap[mimeType] || 'webm';
+    // Clean mimeType (remove codecs if present)
+    const baseMimeType = mimeType.split(';')[0];
+    const extension = extensionMap[baseMimeType] || extensionMap[mimeType] || 'webm';
+    const filename = `audio.${extension}`;
 
-    // Create temporary file
-    const tempPath = path.join('/tmp', `audio-${Date.now()}.${extension}`);
-    fs.writeFileSync(tempPath, buffer);
+    console.log(`[Transcribe] Processing audio: ${filename}, mime: ${mimeType}`);
 
-    let finalPath = tempPath;
-
-    // If file is too large for Whisper (>25MB), compress with ffmpeg
-    if (fileSizeMB > 24) {
-      console.log(`[Transcribe] File too large, compressing with ffmpeg...`);
-
-      const compressedPath = path.join('/tmp', `audio-${Date.now()}-compressed.mp3`);
-
-      try {
-        // Convert to MP3 with lower bitrate (64kbps is fine for speech)
-        // -ac 1 = mono, -ar 16000 = 16kHz sample rate (optimal for speech)
-        execSync(
-          `ffmpeg -i "${tempPath}" -vn -ac 1 -ar 16000 -ab 64k -f mp3 "${compressedPath}" -y`,
-          { stdio: 'pipe' }
-        );
-
-        // Check compressed size
-        const compressedStats = fs.statSync(compressedPath);
-        const compressedSizeMB = compressedStats.size / (1024 * 1024);
-        console.log(`[Transcribe] Compressed to ${compressedSizeMB.toFixed(2)}MB`);
-
-        if (compressedSizeMB > 25) {
-          // Still too large even after compression
-          fs.unlinkSync(tempPath);
-          fs.unlinkSync(compressedPath);
-          return NextResponse.json(
-            { error: `Audio too long. Compressed size: ${compressedSizeMB.toFixed(2)}MB (max 25MB). Try a shorter recording.` },
-            { status: 413 }
-          );
-        }
-
-        // Use compressed file
-        finalPath = compressedPath;
-
-      } catch (ffmpegError: any) {
-        console.error('[Transcribe] ffmpeg compression failed:', ffmpegError.message);
-        // Fall back to original file and let Whisper reject if too large
-        console.log('[Transcribe] Falling back to original file...');
-      }
-    }
-
-    console.log(`[Transcribe] Processing audio file: ${finalPath}`);
+    // Use OpenAI's toFile helper to create a file-like object from buffer
+    // This works in serverless environments without filesystem access
+    const file = await toFile(buffer, filename, { type: baseMimeType });
 
     // Call Whisper API
     const response = await openai.audio.transcriptions.create({
-      file: fs.createReadStream(finalPath),
+      file,
       model: 'whisper-1',
       response_format: 'verbose_json',
       timestamp_granularities: ['segment'],
     });
-
-    // Clean up temporary files
-    if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
-    if (finalPath !== tempPath && fs.existsSync(finalPath)) fs.unlinkSync(finalPath);
 
     // Structure response
     const result: TranscribeResponse = {
@@ -182,11 +147,6 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Allow large audio files (up to 250MB base64 encoded)
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '250mb',
-    },
-  },
-};
+// Next.js App Router configuration for large request bodies
+// Note: Vercel has a 4.5MB limit on serverless functions by default
+// For larger files, consider using Vercel Blob storage or chunking
