@@ -2,9 +2,10 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Project, PhotoMetadata, AudioMetadata } from '../../lib/types';
-import { getProject, getProjectPhotos, getProjectAudio, deletePhoto, deleteAudio, updateProject, deleteProject, deleteLaunchSession } from '../../lib/db';
+import { Project, PhotoMetadata, AudioMetadata, ProcessingResult, Transcript, TranscriptSegment, PhotoAnalysis, ProcessingProgress } from '../../lib/types';
+import { getProject, getProjectPhotos, getProjectAudio, deletePhoto, deleteAudio, updateProject, deleteProject, deleteLaunchSession, saveProcessingResult, getSessionProcessingResult } from '../../lib/db';
 import { downloadBlob, exportPortableEvidencePackage, generatePortableFilename } from '../../lib/export';
+import { findMatchingSegment } from '../../lib/correlation';
 
 export default function ProjectDetailsPage() {
   const params = useParams();
@@ -21,6 +22,12 @@ export default function ProjectDetailsPage() {
   const [isExporting, setIsExporting] = useState(false);
   const [showExportDeleteConfirm, setShowExportDeleteConfirm] = useState(false);
   const [exportedFilename, setExportedFilename] = useState<string | null>(null);
+
+  // Processing state
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingProgress, setProcessingProgress] = useState<ProcessingProgress | null>(null);
+  const [processingResult, setProcessingResult] = useState<ProcessingResult | null>(null);
+  const [processingError, setProcessingError] = useState<string | null>(null);
 
   // Touch handling for swipe
   const touchStartX = useRef<number>(0);
@@ -74,6 +81,132 @@ export default function ProjectDetailsPage() {
       return `${(bytes / 1024).toFixed(1)} KB`;
     }
     return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  };
+
+  // Check for existing processing results when data loads
+  useEffect(() => {
+    const checkExistingResults = async () => {
+      if (audio.length > 0) {
+        const sessionId = audio[0].sessionId;
+        const existingResult = await getSessionProcessingResult(sessionId);
+        if (existingResult && existingResult.status === 'completed') {
+          setProcessingResult(existingResult);
+        }
+      }
+    };
+    checkExistingResults();
+  }, [audio]);
+
+  // Batch process session: transcribe audio + analyze all photos
+  const handleProcessSession = async () => {
+    if (!project || audio.length === 0) return;
+
+    setIsProcessing(true);
+    setProcessingError(null);
+    setProcessingProgress({ step: 'transcribing', progress: 0, message: 'Starting transcription...' });
+
+    const sessionId = audio[0].sessionId;
+    const audioItem = audio[0];
+
+    try {
+      // Step 1: Transcribe audio
+      console.log('[ProcessSession] Starting transcription...');
+      setProcessingProgress({ step: 'transcribing', progress: 10, message: 'Transcribing audio...' });
+
+      const transcribeResponse = await fetch('/api/transcribe-audio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          audioData: audioItem.audioData,
+          mimeType: audioItem.mimeType
+        })
+      });
+
+      if (!transcribeResponse.ok) {
+        const errorData = await transcribeResponse.json();
+        throw new Error(errorData.error || 'Transcription failed');
+      }
+
+      const transcriptData = await transcribeResponse.json();
+      const transcript: Transcript = transcriptData.transcript;
+      console.log('[ProcessSession] Transcription complete:', transcript.fullText.substring(0, 100) + '...');
+
+      setProcessingProgress({ step: 'analyzing_photos', progress: 30, message: `Analyzing ${photos.length} photos...`, currentItem: 0, totalItems: photos.length });
+
+      // Step 2: Analyze each photo with transcript context
+      const photoAnalyses: PhotoAnalysis[] = [];
+
+      for (let i = 0; i < photos.length; i++) {
+        const photo = photos[i];
+        setProcessingProgress({
+          step: 'analyzing_photos',
+          progress: 30 + Math.round((i / photos.length) * 60),
+          message: `Analyzing photo ${i + 1} of ${photos.length}...`,
+          currentItem: i + 1,
+          totalItems: photos.length
+        });
+
+        // Find matching transcript segment for this photo
+        const matchedSegment = findMatchingSegment(photo.sessionTimestamp, transcript.segments);
+
+        console.log(`[ProcessSession] Photo ${i + 1}: sessionTimestamp=${photo.sessionTimestamp}, matched segment:`, matchedSegment?.text?.substring(0, 50));
+
+        try {
+          const analyzeResponse = await fetch('/api/analyze-photo', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              photoId: photo.id,
+              imageData: photo.imageData,
+              gps: photo.gps,
+              timestamp: photo.timestamp,
+              sessionTimestamp: photo.sessionTimestamp,
+              transcriptSegment: matchedSegment,
+              provider: 'openai',
+              model: 'gpt-4o-mini'
+            })
+          });
+
+          if (analyzeResponse.ok) {
+            const analyzeData = await analyzeResponse.json();
+            photoAnalyses.push(analyzeData.analysis);
+          } else {
+            console.error(`[ProcessSession] Failed to analyze photo ${i + 1}`);
+            // Continue with other photos even if one fails
+          }
+        } catch (photoError) {
+          console.error(`[ProcessSession] Error analyzing photo ${i + 1}:`, photoError);
+        }
+      }
+
+      console.log(`[ProcessSession] Analyzed ${photoAnalyses.length} of ${photos.length} photos`);
+
+      // Step 3: Save processing result
+      setProcessingProgress({ step: 'saving', progress: 95, message: 'Saving results...' });
+
+      const result: ProcessingResult = {
+        id: crypto.randomUUID(),
+        projectId: project.id,
+        sessionId,
+        createdAt: new Date().toISOString(),
+        status: 'completed',
+        transcript,
+        photoAnalyses,
+        entities: [] // Will extract in future phase
+      };
+
+      await saveProcessingResult(result);
+      setProcessingResult(result);
+
+      setProcessingProgress({ step: 'saving', progress: 100, message: 'Processing complete!' });
+      console.log('[ProcessSession] Complete!');
+
+    } catch (error: any) {
+      console.error('[ProcessSession] Error:', error);
+      setProcessingError(error.message || 'Processing failed');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -347,8 +480,13 @@ export default function ProjectDetailsPage() {
                   >
                     <div className="flex items-center gap-3 mb-3">
                       <div className="flex-1">
-                        <div className="text-white text-sm font-medium">
+                        <div className="text-white text-sm font-medium flex items-center gap-2">
                           Session {audioItem.sessionId.slice(0, 8)}
+                          {processingResult && (
+                            <span className="px-2 py-0.5 bg-green-600 text-white text-xs rounded-full">
+                              Processed
+                            </span>
+                          )}
                         </div>
                         <div className="text-gray-400 text-xs">
                           {formatTimestamp(audioItem.timestamp)} • {formatDuration(audioItem.duration)} • {formatFileSize(audioItem.fileSize)}
@@ -377,6 +515,56 @@ export default function ProjectDetailsPage() {
                   </div>
               ))}
             </div>
+
+            {/* Process Session Button */}
+            {!processingResult && photos.length > 0 && (
+              <button
+                onClick={handleProcessSession}
+                disabled={isProcessing}
+                className="mt-4 w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-800 disabled:opacity-50 text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                {isProcessing ? (
+                  <>
+                    <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                    Process Session (Transcribe + Analyze Photos)
+                  </>
+                )}
+              </button>
+            )}
+
+            {processingError && (
+              <p className="mt-2 text-red-400 text-sm text-center">{processingError}</p>
+            )}
+
+            {/* Transcript Display */}
+            {processingResult?.transcript && (
+              <div className="mt-4 bg-gray-800 rounded-lg p-4 border border-gray-700">
+                <h3 className="text-white font-medium mb-2 flex items-center gap-2">
+                  <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Transcript
+                </h3>
+                <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap">
+                  {processingResult.transcript.fullText}
+                </p>
+                {processingResult.transcript.language && (
+                  <p className="text-gray-500 text-xs mt-2">
+                    Language: {processingResult.transcript.language} • Duration: {formatDuration(processingResult.transcript.duration)}
+                  </p>
+                )}
+              </div>
+            )}
           </section>
         )}
 
@@ -542,6 +730,48 @@ export default function ProjectDetailsPage() {
               <div className="text-gray-400 text-sm">No GPS data • Session: {formatDuration(selectedPhoto.sessionTimestamp)}</div>
             )}
 
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Processing Progress Modal */}
+      {isProcessing && processingProgress && (
+        <div className="fixed inset-0 bg-black/90 z-[60] flex items-center justify-center p-4">
+          <div className="bg-gray-800 rounded-lg p-6 max-w-sm w-full border border-gray-700">
+            <h3 className="text-white font-semibold text-lg mb-4 flex items-center gap-2">
+              <svg className="animate-spin w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Processing Session
+            </h3>
+
+            {/* Progress bar */}
+            <div className="mb-4">
+              <div className="flex justify-between text-xs text-gray-400 mb-1">
+                <span>{processingProgress.message}</span>
+                <span>{processingProgress.progress}%</span>
+              </div>
+              <div className="w-full bg-gray-700 rounded-full h-2">
+                <div
+                  className="bg-purple-500 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${processingProgress.progress}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Step indicators */}
+            <div className="space-y-2 text-sm">
+              <div className={`flex items-center gap-2 ${processingProgress.step === 'transcribing' ? 'text-purple-400' : processingProgress.progress > 30 ? 'text-green-400' : 'text-gray-500'}`}>
+                {processingProgress.progress > 30 ? '✓' : processingProgress.step === 'transcribing' ? '○' : '○'} Transcribing audio
+              </div>
+              <div className={`flex items-center gap-2 ${processingProgress.step === 'analyzing_photos' ? 'text-purple-400' : processingProgress.progress > 90 ? 'text-green-400' : 'text-gray-500'}`}>
+                {processingProgress.progress > 90 ? '✓' : processingProgress.step === 'analyzing_photos' ? '○' : '○'} Analyzing photos {processingProgress.currentItem && processingProgress.totalItems ? `(${processingProgress.currentItem}/${processingProgress.totalItems})` : ''}
+              </div>
+              <div className={`flex items-center gap-2 ${processingProgress.step === 'saving' ? 'text-purple-400' : processingProgress.progress >= 100 ? 'text-green-400' : 'text-gray-500'}`}>
+                {processingProgress.progress >= 100 ? '✓' : processingProgress.step === 'saving' ? '○' : '○'} Saving results
+              </div>
             </div>
           </div>
         </div>

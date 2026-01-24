@@ -116,3 +116,44 @@ export function getCorrelationStats(
     total: matched + unmatched
   };
 }
+
+/**
+ * Find a matching transcript segment for a single photo timestamp
+ */
+export function findMatchingSegment(
+  photoTimestamp: number,
+  segments: TranscriptSegment[]
+): TranscriptSegment | null {
+  if (!segments || segments.length === 0) {
+    return null;
+  }
+
+  if (photoTimestamp < 0 || !Number.isFinite(photoTimestamp)) {
+    return null;
+  }
+
+  let bestMatch: TranscriptSegment | null = null;
+  let bestDistance = Infinity;
+
+  for (const segment of segments) {
+    // Exact match - photo taken during this segment
+    if (photoTimestamp >= segment.start && photoTimestamp <= segment.end) {
+      return segment;
+    }
+
+    // Find closest segment within threshold
+    let distance: number;
+    if (photoTimestamp < segment.start) {
+      distance = segment.start - photoTimestamp;
+    } else {
+      distance = photoTimestamp - segment.end;
+    }
+
+    if (distance < bestDistance && distance <= CORRELATION_THRESHOLD_SECONDS) {
+      bestMatch = segment;
+      bestDistance = distance;
+    }
+  }
+
+  return bestMatch;
+}
