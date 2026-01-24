@@ -28,6 +28,7 @@ export default function ProjectDetailsPage() {
   const [processingProgress, setProcessingProgress] = useState<ProcessingProgress | null>(null);
   const [processingResult, setProcessingResult] = useState<ProcessingResult | null>(null);
   const [processingError, setProcessingError] = useState<string | null>(null);
+  const [showAudioTooLargeDialog, setShowAudioTooLargeDialog] = useState(false);
 
   // Touch handling for swipe
   const touchStartX = useRef<number>(0);
@@ -111,79 +112,102 @@ export default function ProjectDetailsPage() {
   };
 
   // Batch process session: transcribe audio + analyze all photos
-  const handleProcessSession = async () => {
-    if (!project || audio.length === 0) return;
+  // skipAudio: true to skip transcription (for corrupted/oversized audio from old captures)
+  const handleProcessSession = async (skipAudio: boolean = false) => {
+    if (!project) return;
+    if (!skipAudio && audio.length === 0) return;
+
+    // Check if audio is too large (pre-fix captures with video frames)
+    if (!skipAudio && audio.length > 0) {
+      const audioItem = audio[0];
+      const fileSizeMB = audioItem.fileSize / (1024 * 1024);
+      // If audio is >25MB, it's likely a pre-fix capture with video frames
+      if (fileSizeMB > 25) {
+        console.log(`[ProcessSession] Audio too large (${fileSizeMB.toFixed(2)}MB), showing dialog`);
+        setShowAudioTooLargeDialog(true);
+        return;
+      }
+    }
 
     setIsProcessing(true);
     setProcessingError(null);
-    setProcessingProgress({ step: 'transcribing', progress: 0, message: 'Starting transcription...' });
+    setShowAudioTooLargeDialog(false);
 
-    const sessionId = audio[0].sessionId;
-    const audioItem = audio[0];
+    const sessionId = audio.length > 0 ? audio[0].sessionId : crypto.randomUUID();
+    const audioItem = audio.length > 0 ? audio[0] : null;
 
     try {
-      // Step 1: Handle audio - upload to blob if large, or send directly
-      const fileSizeMB = audioItem.fileSize / (1024 * 1024);
-      console.log(`[ProcessSession] Audio size: ${fileSizeMB.toFixed(2)}MB`);
+      let transcript: Transcript | null = null;
 
-      let audioUrl: string | undefined;
-      let audioData: string | undefined;
+      // Step 1: Handle audio (skip if requested or no audio)
+      if (!skipAudio && audioItem) {
+        const fileSizeMB = audioItem.fileSize / (1024 * 1024);
+        console.log(`[ProcessSession] Audio size: ${fileSizeMB.toFixed(2)}MB`);
+        setProcessingProgress({ step: 'transcribing', progress: 0, message: 'Starting transcription...' });
 
-      if (fileSizeMB > 4) {
-        // Large file - upload to Vercel Blob first
-        console.log('[ProcessSession] Large file detected, uploading to blob storage...');
-        setProcessingProgress({ step: 'uploading', progress: 5, message: 'Uploading audio...' });
+        let audioUrl: string | undefined;
+        let audioData: string | undefined;
 
-        try {
-          const { upload } = await import('@vercel/blob/client');
-          const audioBlob = dataURLtoBlob(audioItem.audioData);
+        if (fileSizeMB > 4) {
+          // Large file - upload to Vercel Blob first
+          console.log('[ProcessSession] Large file detected, uploading to blob storage...');
+          setProcessingProgress({ step: 'uploading', progress: 5, message: 'Uploading audio...' });
 
-          const result = await upload(
-            `audio-${audioItem.sessionId}.webm`,
-            audioBlob,
-            {
-              access: 'public',
-              handleUploadUrl: '/api/upload-audio',
-            }
-          );
+          try {
+            const { upload } = await import('@vercel/blob/client');
+            const audioBlob = dataURLtoBlob(audioItem.audioData);
 
-          audioUrl = result.url;
-          console.log('[ProcessSession] Audio uploaded to:', audioUrl);
-        } catch (uploadError: any) {
-          console.error('[ProcessSession] Blob upload failed:', uploadError);
-          throw new Error(`Failed to upload large audio file: ${uploadError.message}`);
+            // Add timestamp to avoid conflicts with previous upload attempts
+            const result = await upload(
+              `audio-${audioItem.sessionId}-${Date.now()}.webm`,
+              audioBlob,
+              {
+                access: 'public',
+                handleUploadUrl: '/api/upload-audio',
+              }
+            );
+
+            audioUrl = result.url;
+            console.log('[ProcessSession] Audio uploaded to:', audioUrl);
+          } catch (uploadError: any) {
+            console.error('[ProcessSession] Blob upload failed:', uploadError);
+            throw new Error(`Failed to upload large audio file: ${uploadError.message}`);
+          }
+        } else {
+          // Small file - send directly as base64
+          audioData = audioItem.audioData;
         }
+
+        // Transcribe audio
+        console.log('[ProcessSession] Starting transcription...');
+        setProcessingProgress({ step: 'transcribing', progress: 10, message: 'Transcribing audio...' });
+
+        const transcribeResponse = await fetch('/api/transcribe-audio', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            audioUrl,
+            audioData,
+            mimeType: audioItem.mimeType
+          })
+        });
+
+        if (!transcribeResponse.ok) {
+          const errorData = await transcribeResponse.json();
+          throw new Error(errorData.error || 'Transcription failed');
+        }
+
+        const transcriptData = await transcribeResponse.json();
+        transcript = transcriptData.transcript;
+        console.log('[ProcessSession] Transcription complete:', transcript!.fullText.substring(0, 100) + '...');
       } else {
-        // Small file - send directly as base64
-        audioData = audioItem.audioData;
+        console.log('[ProcessSession] Skipping audio transcription');
+        setProcessingProgress({ step: 'analyzing_photos', progress: 10, message: 'Skipping audio (photos only)...' });
       }
-
-      // Step 2: Transcribe audio
-      console.log('[ProcessSession] Starting transcription...');
-      setProcessingProgress({ step: 'transcribing', progress: 10, message: 'Transcribing audio...' });
-
-      const transcribeResponse = await fetch('/api/transcribe-audio', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          audioUrl,
-          audioData,
-          mimeType: audioItem.mimeType
-        })
-      });
-
-      if (!transcribeResponse.ok) {
-        const errorData = await transcribeResponse.json();
-        throw new Error(errorData.error || 'Transcription failed');
-      }
-
-      const transcriptData = await transcribeResponse.json();
-      const transcript: Transcript = transcriptData.transcript;
-      console.log('[ProcessSession] Transcription complete:', transcript.fullText.substring(0, 100) + '...');
 
       setProcessingProgress({ step: 'analyzing_photos', progress: 30, message: `Analyzing ${photos.length} photos...`, currentItem: 0, totalItems: photos.length });
 
-      // Step 2: Analyze each photo with transcript context
+      // Step 2: Analyze each photo with transcript context (if available)
       const photoAnalyses: PhotoAnalysis[] = [];
 
       for (let i = 0; i < photos.length; i++) {
@@ -196,10 +220,10 @@ export default function ProjectDetailsPage() {
           totalItems: photos.length
         });
 
-        // Find matching transcript segment for this photo
-        const matchedSegment = findMatchingSegment(photo.sessionTimestamp, transcript.segments);
+        // Find matching transcript segment for this photo (if transcript available)
+        const matchedSegment = transcript ? findMatchingSegment(photo.sessionTimestamp, transcript.segments) : null;
 
-        console.log(`[ProcessSession] Photo ${i + 1}: sessionTimestamp=${photo.sessionTimestamp}, matched segment:`, matchedSegment?.text?.substring(0, 50));
+        console.log(`[ProcessSession] Photo ${i + 1}: sessionTimestamp=${photo.sessionTimestamp}, matched segment:`, matchedSegment?.text?.substring(0, 50) || '(no transcript)');
 
         try {
           const analyzeResponse = await fetch('/api/analyze-photo', {
@@ -235,13 +259,20 @@ export default function ProjectDetailsPage() {
       // Step 3: Save processing result
       setProcessingProgress({ step: 'saving', progress: 95, message: 'Saving results...' });
 
+      // Create empty transcript if skipped
+      const finalTranscript: Transcript = transcript || {
+        fullText: skipAudio ? '(Audio skipped - photos only)' : '',
+        segments: [],
+        duration: 0
+      };
+
       const result: ProcessingResult = {
         id: crypto.randomUUID(),
         projectId: project.id,
         sessionId,
         createdAt: new Date().toISOString(),
         status: 'completed',
-        transcript,
+        transcript: finalTranscript,
         photoAnalyses,
         entities: [] // Will extract in future phase
       };
@@ -570,7 +601,7 @@ export default function ProjectDetailsPage() {
             {/* Process Session Button */}
             {!processingResult && photos.length > 0 && (
               <button
-                onClick={handleProcessSession}
+                onClick={() => handleProcessSession()}
                 disabled={isProcessing}
                 className="mt-4 w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-800 disabled:opacity-50 text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
               >
@@ -914,6 +945,49 @@ export default function ProjectDetailsPage() {
                 className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors"
               >
                 Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Audio Too Large Dialog */}
+      {showAudioTooLargeDialog && audio.length > 0 && (
+        <div className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4">
+          <div className="bg-gray-800 rounded-lg p-6 max-w-sm w-full border border-gray-700">
+            <div className="flex items-center gap-2 mb-3">
+              <svg className="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+              <h3 className="text-white font-semibold text-lg">Audio File Too Large</h3>
+            </div>
+            <p className="text-gray-300 text-sm mb-2">
+              This audio recording is <span className="text-yellow-400 font-medium">{(audio[0].fileSize / (1024 * 1024)).toFixed(1)}MB</span> (max 25MB for transcription).
+            </p>
+            <p className="text-gray-400 text-sm mb-4">
+              This capture was recorded before a bug fix. The audio includes video data which inflates the file size.
+            </p>
+            <p className="text-gray-300 text-sm mb-6">
+              You can still analyze the photos without transcription, or delete this capture and re-record with the fixed app.
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => {
+                  setShowAudioTooLargeDialog(false);
+                  handleProcessSession(true); // Skip audio, analyze photos only
+                }}
+                className="w-full px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                Analyze Photos Only
+              </button>
+              <button
+                onClick={() => setShowAudioTooLargeDialog(false)}
+                className="w-full px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+              >
+                Cancel
               </button>
             </div>
           </div>
