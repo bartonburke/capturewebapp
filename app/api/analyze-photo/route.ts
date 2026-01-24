@@ -32,12 +32,29 @@ function buildAnalysisPrompt(
 The field consultant said the following while taking this photo:
 "${transcriptContext.text}"
 
-**IMPORTANT**: Use this verbal context to:
+**IMPORTANT**: Use this verbal context to enhance your analysis:
+
 1. **Answer questions**: If the consultant asks "What is this?" or "I wonder if...", try to answer based on what you see
-2. **Extract action items**: If they say "add to to-do" or "need to check later", create an ActionItem entity
-3. **Note their observations**: If they share context like "the site manager said..." or "this used to be...", incorporate it
+
+2. **Extract action items**: If they say "add to to-do", "need to check later", "follow up on", or express intent to return, create an ActionItem entity
+
+3. **Note their observations**: If they share context like "the site manager said..." or "this used to be...", incorporate it into your description
+
 4. **Validate hypotheses**: If they mention what something might be, confirm or challenge based on visual evidence
+
 5. **Flag uncertainties**: If they express uncertainty, note it and provide your assessment
+
+6. **Extract specific details requested**: If the consultant mentions wanting to capture specific information (serial numbers, model numbers, dates, measurements visible in the photo), extract and highlight that exact data in the extractedData field
+
+7. **Handle comparison requests**: If the consultant says "this looks similar to...", "compare this to what we saw earlier", or references previous observations, note the comparison being made and describe relevant similarities or differences visible in this photo
+
+8. **Detect priority signals**: If the consultant expresses urgency ("this is critical", "high priority", "needs immediate attention", "red flag") or concern, flag the entity with severity "high" and explain why in priorityReason
+
+9. **Extract measurements**: If the consultant mentions dimensions, quantities, or asks you to estimate size ("about 10 feet", "three tanks", "looks like 500 gallons"), include those measurements in extractedData and verify against visual evidence if possible
+
+10. **Suggest follow-up photos**: If the current photo doesn't fully capture what the consultant mentioned (e.g., they asked about a label but it's not visible, or mentioned something out of frame), include a recommendation in suggestedFollowUp
+
+11. **Link verbal context to visual evidence**: When the consultant provides history ("this was installed in 1985", "they said it hasn't been serviced"), cross-reference with visible evidence (dates on equipment, condition indicators) to validate or note discrepancies
 `;
   }
 
@@ -60,7 +77,7 @@ Analyze this photograph and provide:
 
 2. CATALOG TAGS (searchable keywords - comprehensive list)
 ${catalogTagsSection}
-   ${transcriptContext ? '\n   **Transcript-derived:** action_item, question_raised, consultant_observation, needs_verification' : ''}
+   ${transcriptContext ? '\n   **Transcript-derived:** action_item, question_raised, consultant_observation, needs_verification, comparison_requested, measurement_noted, follow_up_needed, high_priority_verbal, data_extraction_request, historical_context' : ''}
 
 3. EXTRACTED ENTITIES (structured findings - be comprehensive)
    For each significant observation, create an entity with:
@@ -95,7 +112,10 @@ Respond ONLY with valid JSON in this exact structure:
       "severity": "high" | "medium" | "low" | "info",
       "recommendation": "string or null"${transcriptContext ? `,
       "consultantContext": "string or null",
-      "aiResponse": "string or null"` : ''}
+      "aiResponse": "string or null",
+      "extractedData": "string or null",
+      "suggestedFollowUp": "string or null",
+      "priorityReason": "string or null"` : ''}
     }
   ]
 }`;

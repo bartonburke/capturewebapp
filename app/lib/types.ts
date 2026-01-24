@@ -144,9 +144,13 @@ export interface PhotoEntity {
   description: string;
   severity: 'high' | 'medium' | 'low' | 'info';
   recommendation?: string;
-  // New fields for transcript-aware analysis
+  // Transcript-aware analysis fields
   consultantContext?: string;  // What the consultant said that prompted this
   aiResponse?: string;         // AI's answer to a question, if applicable
+  // Enhanced transcript-derived fields
+  extractedData?: string;      // Specific data extracted (serial numbers, measurements)
+  suggestedFollowUp?: string;  // Suggested additional photo if current doesn't capture request
+  priorityReason?: string;     // Why this was flagged high priority (from verbal cues)
 }
 
 // ESA entity types
