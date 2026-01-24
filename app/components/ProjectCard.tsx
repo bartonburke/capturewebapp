@@ -12,6 +12,11 @@ interface ProjectCardProps {
 export default function ProjectCard({ project, onClick, onDelete }: ProjectCardProps) {
   const typeConfig = getTypeConfig(project.projectType || 'phase1-esa');
 
+  // Determine processing status
+  const hasAudio = (project.audioCount || 0) > 0;
+  const isProcessed = project.processingStage && ['transcribed', 'analyzed', 'graph_ready'].includes(project.processingStage);
+  const needsProcessing = hasAudio && !isProcessed;
+
   return (
     <div className="group relative bg-white/10 backdrop-blur-sm rounded-xl overflow-hidden transition-all hover:bg-white/15">
       <button
@@ -43,8 +48,19 @@ export default function ProjectCard({ project, onClick, onDelete }: ProjectCardP
         <div className="flex-1 p-3 min-w-0">
           <div className="flex justify-between items-start">
             <div className="flex-1 pr-2 min-w-0">
-              <div className="flex items-center gap-2 mb-0.5">
+              <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                 <h3 className="font-semibold text-white truncate">{project.name}</h3>
+                {/* Processing status pill */}
+                {isProcessed && (
+                  <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-green-600 text-white">
+                    Processed
+                  </span>
+                )}
+                {needsProcessing && (
+                  <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-600 text-white">
+                    Needs Processing
+                  </span>
+                )}
                 {/* Launched badge */}
                 {project.launchSessionId && (
                   <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-purple-600 text-white">

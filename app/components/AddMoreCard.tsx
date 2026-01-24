@@ -14,9 +14,9 @@ export default function AddMoreCard() {
     <>
       <button
         onClick={handleClick}
-        className="relative flex-shrink-0 w-24 h-28 rounded-2xl
+        className="relative flex-shrink-0 w-24 h-24 rounded-2xl
           border-2 border-dashed border-white/30
-          flex flex-col items-center justify-center gap-1.5
+          flex flex-col items-center justify-center gap-1
           transition-all duration-150 active:scale-95 hover:border-white/50
           snap-start bg-white/5"
       >

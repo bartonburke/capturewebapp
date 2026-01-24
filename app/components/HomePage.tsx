@@ -202,8 +202,8 @@ export default function HomePage() {
       </HorizontalScrollRow>
 
       {/* Recent Projects Section */}
-      <div className="max-w-2xl mx-auto px-4 pb-28">
-        <h2 className="text-lg font-semibold text-white mb-3">Recent Projects</h2>
+      <div className="max-w-2xl mx-auto px-6 pb-32">
+        <h2 className="text-lg font-semibold text-white mb-4">Recent Projects</h2>
 
         {loading ? (
           <div className="text-center text-gray-400 py-8">Loading projects...</div>
@@ -216,7 +216,7 @@ export default function HomePage() {
             </p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {recentProjects.map((project) => (
               <ProjectCard
                 key={project.id}

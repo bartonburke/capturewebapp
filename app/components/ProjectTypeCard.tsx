@@ -12,8 +12,8 @@ export default function ProjectTypeCard({ config, projectCount, onClick }: Proje
   return (
     <button
       onClick={onClick}
-      className={`relative flex-shrink-0 w-24 h-28 rounded-2xl ${config.bgColor}
-        flex flex-col items-center justify-center gap-1.5
+      className={`relative flex-shrink-0 w-24 h-24 rounded-2xl ${config.bgColor}
+        flex flex-col items-center justify-center gap-1
         transition-transform duration-150 active:scale-95
         snap-start shadow-lg shadow-black/30`}
     >
