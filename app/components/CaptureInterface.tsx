@@ -241,6 +241,13 @@ export default function CaptureInterface({ project, context }: Props) {
       setAudioError(null);
       console.log('Audio recorder initialized with mimeType:', mimeType);
 
+      // Start recording immediately if session is active
+      // This prevents race conditions with useEffect timing
+      if (recorder.state === 'inactive') {
+        console.log('Starting audio recording immediately after initialization');
+        recorder.start(1000); // Collect data every 1 second
+      }
+
     } catch (err) {
       const error = err as Error;
       console.error('Failed to initialize audio recorder:', error);
@@ -404,8 +411,10 @@ export default function CaptureInterface({ project, context }: Props) {
     if (!audioRecorder) return;
 
     if (sessionState === 'RECORDING' && audioRecorder.state === 'inactive') {
-      console.log('Starting audio recording');
+      console.log('Starting audio recording (fallback)');
       audioRecorder.start(1000); // Collect data every 1 second
+    } else if (sessionState === 'RECORDING' && audioRecorder.state === 'recording') {
+      console.log('Audio already recording - no action needed');
     } else if (sessionState === 'PAUSED' && audioRecorder.state === 'recording') {
       console.log('Pausing audio recording');
       audioRecorder.pause();
@@ -542,7 +551,8 @@ export default function CaptureInterface({ project, context }: Props) {
   const saveAudioRecording = async () => {
     try {
       if (audioChunksRef.current.length === 0) {
-        console.log('No audio chunks to save');
+        console.warn('[Audio] No audio chunks to save - recording may have failed to start');
+        console.warn('[Audio] This can happen if: 1) microphone permission denied, 2) MediaRecorder.start() never called, 3) session was too short');
         return;
       }
 
