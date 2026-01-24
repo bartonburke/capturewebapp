@@ -134,6 +134,59 @@ const boreholeEntities: EntitySchemaItem[] = [
   },
 ];
 
+// Asset Tagging entity schema
+const assetTaggingEntities: EntitySchemaItem[] = [
+  {
+    name: 'asset',
+    displayName: 'Asset',
+    description: 'Equipment, furniture, or inventory item',
+    extractionKeywords: ['equipment', 'asset', 'item', 'device', 'machine', 'unit', 'appliance'],
+    confidenceThreshold: 0.7,
+  },
+  {
+    name: 'serial_number',
+    displayName: 'Serial Number',
+    description: 'Manufacturer serial, model number, or asset tag',
+    extractionKeywords: ['serial', 'model', 'part number', 'asset tag', 'barcode', 'QR code'],
+    confidenceThreshold: 0.8,
+  },
+  {
+    name: 'location',
+    displayName: 'Location',
+    description: 'Room, floor, zone, rack position, or area description',
+    extractionKeywords: ['room', 'floor', 'zone', 'rack', 'area', 'building', 'section'],
+    confidenceThreshold: 0.7,
+  },
+  {
+    name: 'condition',
+    displayName: 'Condition',
+    description: 'Physical state of the asset',
+    extractionKeywords: ['new', 'good', 'fair', 'poor', 'damaged', 'needs repair', 'worn'],
+    confidenceThreshold: 0.7,
+  },
+  {
+    name: 'category',
+    displayName: 'Category',
+    description: 'Asset classification type',
+    extractionKeywords: ['IT equipment', 'furniture', 'HVAC', 'safety equipment', 'tools', 'electronics'],
+    confidenceThreshold: 0.7,
+  },
+  {
+    name: 'manufacturer',
+    displayName: 'Manufacturer',
+    description: 'Brand or make information',
+    extractionKeywords: ['brand', 'manufacturer', 'make', 'vendor', 'company'],
+    confidenceThreshold: 0.7,
+  },
+  {
+    name: 'action_item',
+    displayName: 'Action Item',
+    description: 'Maintenance needed, replacement due, or missing documentation',
+    extractionKeywords: ['maintenance', 'repair', 'replace', 'missing', 'overdue', 'inspection'],
+    confidenceThreshold: 0.6,
+  },
+];
+
 // Generic entity schema (minimal)
 const genericEntities: EntitySchemaItem[] = [
   {
@@ -173,6 +226,15 @@ const boreholePrompts = [
   'Photograph core samples before packaging',
 ];
 
+const assetTaggingPrompts = [
+  'Read the serial number and model aloud',
+  'Describe the asset\'s current condition',
+  'Note the exact location - room, floor, and position',
+  'Mention any visible damage or wear',
+  'State the asset category and purpose',
+  'Note any maintenance tags or inspection dates',
+];
+
 const genericPrompts = [
   'Document site conditions and features',
   'Photograph notable observations',
@@ -193,6 +255,17 @@ const boreholeVisionPrompt = `Analyze this photo for geotechnical and environmen
 Identify drilling equipment, soil types, stratum changes, sample locations, contamination
 indicators, and safety compliance. Note any visual soil characteristics relevant to
 Phase II investigation or remediation planning.`;
+
+const assetTaggingVisionPrompt = `Analyze this photo for asset inventory and identification.
+Identify and extract:
+- Asset type and description (equipment, furniture, electronics, machinery, etc.)
+- Visible serial numbers, barcodes, QR codes, or asset tags
+- Brand/manufacturer if visible on labels or equipment
+- Condition assessment (new, good, fair, poor, damaged)
+- Location context from surroundings (room type, floor, position)
+- Warning labels, inspection stickers, or compliance tags
+- Any maintenance indicators or service due dates
+Provide specific observations for inventory documentation.`;
 
 const genericVisionPrompt = `Analyze this photo and describe the site conditions,
 notable features, and any observations relevant to environmental or engineering assessment.`;
@@ -216,6 +289,12 @@ export const DEFAULT_CONTEXTS: Record<ProjectType, ProjectContext> = {
     entitySchema: boreholeEntities,
     capturePrompts: boreholePrompts,
     visionAnalysisPrompt: boreholeVisionPrompt,
+  },
+  'asset-tagging': {
+    projectType: 'asset-tagging',
+    entitySchema: assetTaggingEntities,
+    capturePrompts: assetTaggingPrompts,
+    visionAnalysisPrompt: assetTaggingVisionPrompt,
   },
   'generic': {
     projectType: 'generic',

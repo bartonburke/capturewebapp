@@ -84,6 +84,7 @@ export default function CreateProjectModal({ onClose, onProjectCreated }: Props)
               <option value="phase1-esa">Phase I ESA</option>
               <option value="eir-eis">EIR/EIS</option>
               <option value="borehole">Borehole Analysis</option>
+              <option value="asset-tagging">Asset Tagging</option>
               <option value="generic">General Site Visit</option>
             </select>
           </div>

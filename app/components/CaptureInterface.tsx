@@ -21,6 +21,7 @@ const PROJECT_TYPE_BADGES: Record<ProjectType, { bg: string; label: string }> = 
   'phase1-esa': { bg: 'bg-green-600', label: 'Phase I ESA' },
   'eir-eis': { bg: 'bg-blue-600', label: 'EIR/EIS' },
   'borehole': { bg: 'bg-orange-600', label: 'Borehole' },
+  'asset-tagging': { bg: 'bg-cyan-600', label: 'Asset Tagging' },
   'generic': { bg: 'bg-gray-600', label: 'Site Visit' },
 };
 
