@@ -209,6 +209,10 @@ export default function CaptureInterface({ project, context }: Props) {
 
       console.log('Initializing audio recorder...');
 
+      // Create audio-only stream to avoid recording video frames
+      // This dramatically reduces file size (from ~75MB to ~100KB for short recordings)
+      const audioOnlyStream = new MediaStream(audioTracks);
+
       // Determine best supported mime type
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
         ? 'audio/webm;codecs=opus'
@@ -216,7 +220,7 @@ export default function CaptureInterface({ project, context }: Props) {
         ? 'audio/webm'
         : 'audio/mp4'; // Fallback for iOS
 
-      const recorder = new MediaRecorder(stream, { mimeType });
+      const recorder = new MediaRecorder(audioOnlyStream, { mimeType });
 
       // Collect audio chunks as they're available
       recorder.ondataavailable = (event) => {
