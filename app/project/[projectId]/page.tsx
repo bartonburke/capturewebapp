@@ -17,7 +17,6 @@ export default function ProjectDetailsPage() {
   const [photos, setPhotos] = useState<PhotoMetadata[]>([]);
   const [audio, setAudio] = useState<AudioMetadata[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const [confirmDeletePhoto, setConfirmDeletePhoto] = useState<string | null>(null);
   const [confirmDeleteAudio, setConfirmDeleteAudio] = useState<string | null>(null);
   const [confirmDeleteProject, setConfirmDeleteProject] = useState(false);
@@ -35,8 +34,6 @@ export default function ProjectDetailsPage() {
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
 
   // Refs
-  const touchStartX = useRef<number>(0);
-  const touchEndX = useRef<number>(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -296,41 +293,6 @@ export default function ProjectDetailsPage() {
     }
   };
 
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    touchEndX.current = e.touches[0].clientX;
-  };
-
-  const handleTouchEnd = () => {
-    if (selectedPhotoIndex === null) return;
-
-    const swipeDistance = touchStartX.current - touchEndX.current;
-    const minSwipeDistance = 50;
-
-    if (Math.abs(swipeDistance) > minSwipeDistance) {
-      if (swipeDistance > 0) {
-        // Swipe left - next photo
-        navigatePhoto('next');
-      } else {
-        // Swipe right - previous photo
-        navigatePhoto('prev');
-      }
-    }
-  };
-
-  const navigatePhoto = (direction: 'next' | 'prev') => {
-    if (selectedPhotoIndex === null) return;
-
-    if (direction === 'next' && selectedPhotoIndex < photos.length - 1) {
-      setSelectedPhotoIndex(selectedPhotoIndex + 1);
-    } else if (direction === 'prev' && selectedPhotoIndex > 0) {
-      setSelectedPhotoIndex(selectedPhotoIndex - 1);
-    }
-  };
-
   const handleDeletePhoto = async (photoId: string) => {
     try {
       await deletePhoto(photoId);
@@ -344,15 +306,6 @@ export default function ProjectDetailsPage() {
         const updatedProject = { ...project, photoCount: updatedPhotos.length };
         await updateProject(updatedProject);
         setProject(updatedProject);
-      }
-
-      // Close modal if we deleted the current photo
-      if (selectedPhotoIndex !== null) {
-        if (updatedPhotos.length === 0) {
-          setSelectedPhotoIndex(null);
-        } else if (selectedPhotoIndex >= updatedPhotos.length) {
-          setSelectedPhotoIndex(updatedPhotos.length - 1);
-        }
       }
 
       setConfirmDeletePhoto(null);
@@ -539,8 +492,6 @@ export default function ProjectDetailsPage() {
 
   // Processing is now done on desktop via Claude Code skill after import
   // Mobile app only captures and exports raw data
-
-  const selectedPhoto = selectedPhotoIndex !== null ? photos[selectedPhotoIndex] : null;
 
   if (loading) {
     return (
@@ -765,10 +716,10 @@ export default function ProjectDetailsPage() {
               </button>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              {photos.map((photo, index) => (
+              {photos.map((photo) => (
                 <button
                   key={photo.id}
-                  onClick={() => setSelectedPhotoIndex(index)}
+                  onClick={() => router.push(`/project/${projectId}/photo/${photo.id}`)}
                   className="relative aspect-square bg-gray-800 rounded-lg overflow-hidden border border-gray-700 hover:border-blue-500 transition-colors"
                 >
                   <img
@@ -848,119 +799,6 @@ export default function ProjectDetailsPage() {
           </section>
         )}
       </div>
-
-      {/* Photo Detail Modal */}
-      {selectedPhoto && selectedPhotoIndex !== null && (
-        <div
-          className="fixed inset-0 bg-black z-50 flex flex-col"
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between p-4 bg-black/80 flex-shrink-0">
-            <div className="text-white text-sm">
-              {selectedPhotoIndex + 1} / {photos.length}
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => router.push(`/project/${projectId}/photo/${selectedPhoto.id}`)}
-                className="text-blue-400 hover:text-blue-300 transition-colors p-2"
-                aria-label="Photo details"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </button>
-              <button
-                onClick={() => setConfirmDeletePhoto(selectedPhoto.id)}
-                className="text-red-400 hover:text-red-300 transition-colors p-2"
-                aria-label="Delete photo"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </button>
-              <button
-                onClick={() => setSelectedPhotoIndex(null)}
-                className="text-white hover:text-gray-300"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          {/* Scrollable Content Area */}
-          <div className="flex-1 scrollable-y">
-            {/* Image */}
-            <div
-              className="min-h-[60vh] flex items-center justify-center relative"
-              onTouchStart={handleTouchStart}
-              onTouchMove={handleTouchMove}
-              onTouchEnd={handleTouchEnd}
-            >
-            <img
-              src={selectedPhoto.imageData}
-              alt="Full size photo"
-              className="max-w-full max-h-full object-contain"
-            />
-
-            {/* Navigation Arrows */}
-            {selectedPhotoIndex > 0 && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigatePhoto('prev');
-                }}
-                className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-3 rounded-full"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
-            )}
-
-            {selectedPhotoIndex < photos.length - 1 && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigatePhoto('next');
-                }}
-                className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-3 rounded-full"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
-            )}
-            </div>
-
-            {/* Metadata Footer */}
-            <div className="bg-black/80 p-4 text-white space-y-2">
-            <div className="text-sm text-gray-300">
-              {formatTimestamp(selectedPhoto.timestamp)}
-            </div>
-            {selectedPhoto.gps ? (
-              <>
-                <div className="flex items-center gap-2">
-                  <svg className="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-gray-300 font-mono text-sm">
-                    {selectedPhoto.gps.latitude.toFixed(6)}, {selectedPhoto.gps.longitude.toFixed(6)}
-                  </span>
-                </div>
-                <div className="text-gray-400 text-xs">
-                  Accuracy: ±{Math.round(selectedPhoto.gps.accuracy)}m • Session: {formatDuration(selectedPhoto.sessionTimestamp)}
-                </div>
-              </>
-            ) : (
-              <div className="text-gray-400 text-sm">No GPS data • Session: {formatDuration(selectedPhoto.sessionTimestamp)}</div>
-            )}
-
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Processing Progress Modal */}
       {isProcessing && processingProgress && (

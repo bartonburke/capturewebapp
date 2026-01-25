@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { PhotoMetadata, ProcessingResult, PhotoAnalysis, Project } from '@/app/lib/types';
 import { getProject, getProjectPhotos, getProjectAudio } from '@/app/lib/db';
@@ -18,6 +18,15 @@ export default function PhotoDetailPage() {
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+
+  // Carousel navigation state
+  const [allPhotos, setAllPhotos] = useState<PhotoMetadata[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  // Swipe gesture state
+  const touchStartX = useRef<number>(0);
+  const touchEndX = useRef<number>(0);
+  const minSwipeDistance = 50;
 
   // Override global overflow: hidden for this page
   useEffect(() => {
@@ -44,7 +53,16 @@ export default function PhotoDetailPage() {
 
       // Get all photos for this project to find the one we want
       const photos = await getProjectPhotos(projectId);
-      const currentPhoto = photos.find(p => p.id === photoId);
+
+      // Sort photos by timestamp (oldest first) for consistent ordering
+      const sortedPhotos = [...photos].sort((a, b) =>
+        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      );
+      setAllPhotos(sortedPhotos);
+
+      // Find current photo index
+      const index = sortedPhotos.findIndex(p => p.id === photoId);
+      const currentPhoto = index >= 0 ? sortedPhotos[index] : null;
 
       if (!currentPhoto) {
         console.error('Photo not found');
@@ -52,8 +70,9 @@ export default function PhotoDetailPage() {
         return;
       }
 
+      setCurrentIndex(index);
       setPhoto(currentPhoto);
-      console.log('[PhotoDetail] Found photo:', currentPhoto.id);
+      console.log('[PhotoDetail] Found photo:', currentPhoto.id, `(${index + 1} of ${sortedPhotos.length})`);
 
       // Load processing results to find photo analysis
       const audio = await getProjectAudio(projectId);
@@ -142,6 +161,51 @@ export default function PhotoDetailPage() {
     }
   };
 
+  // Navigation functions
+  const navigateToPhoto = useCallback((index: number) => {
+    if (index >= 0 && index < allPhotos.length) {
+      const targetPhoto = allPhotos[index];
+      // Use replace to avoid building up a long history stack
+      router.replace(`/project/${projectId}/photo/${targetPhoto.id}`);
+    }
+  }, [allPhotos, projectId, router]);
+
+  const goToPrevious = useCallback(() => {
+    if (currentIndex > 0) {
+      navigateToPhoto(currentIndex - 1);
+    }
+  }, [currentIndex, navigateToPhoto]);
+
+  const goToNext = useCallback(() => {
+    if (currentIndex < allPhotos.length - 1) {
+      navigateToPhoto(currentIndex + 1);
+    }
+  }, [currentIndex, allPhotos.length, navigateToPhoto]);
+
+  // Swipe handlers
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartX.current = e.targetTouches[0].clientX;
+    touchEndX.current = e.targetTouches[0].clientX;
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    touchEndX.current = e.targetTouches[0].clientX;
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    const swipeDistance = touchStartX.current - touchEndX.current;
+
+    if (Math.abs(swipeDistance) > minSwipeDistance) {
+      if (swipeDistance > 0) {
+        // Swiped left -> go to next photo
+        goToNext();
+      } else {
+        // Swiped right -> go to previous photo
+        goToPrevious();
+      }
+    }
+  }, [goToNext, goToPrevious]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
@@ -160,10 +224,10 @@ export default function PhotoDetailPage() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      {/* Header with Back Button */}
+      {/* Header with Back Button and Photo Count */}
       <div className="flex items-center justify-between p-4 bg-black/90 sticky top-0 z-10">
         <button
-          onClick={() => router.back()}
+          onClick={() => router.push(`/project/${projectId}`)}
           className="flex items-center gap-2 text-blue-400 hover:text-blue-300"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -171,16 +235,51 @@ export default function PhotoDetailPage() {
           </svg>
           Back
         </button>
-        <div className="text-sm text-gray-400">Photo Details</div>
+        <div className="text-sm text-gray-400 font-medium">
+          {allPhotos.length > 0 ? `${currentIndex + 1} of ${allPhotos.length}` : 'Photo Details'}
+        </div>
+        {/* Spacer to center the photo count */}
+        <div className="w-16"></div>
       </div>
 
-      {/* Photo */}
-      <div className="w-full">
+      {/* Photo with Swipe and Navigation */}
+      <div
+        className="w-full relative"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
         <img
           src={photo.imageData}
           alt="Photo"
           className="w-full"
         />
+
+        {/* Previous Button */}
+        {currentIndex > 0 && (
+          <button
+            onClick={goToPrevious}
+            className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 flex items-center justify-center text-white hover:bg-black/70 transition-colors"
+            aria-label="Previous photo"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+        )}
+
+        {/* Next Button */}
+        {currentIndex < allPhotos.length - 1 && (
+          <button
+            onClick={goToNext}
+            className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 flex items-center justify-center text-white hover:bg-black/70 transition-colors"
+            aria-label="Next photo"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        )}
       </div>
 
       {/* Findings Summary Banner - Displayed prominently below photo */}
