@@ -198,41 +198,69 @@ const genericEntities: EntitySchemaItem[] = [
   },
 ];
 
-// Home Inventory entity schema
+// Home Inventory entity schema (v2 - OCR-optimized)
 const homeInventoryEntities: EntitySchemaItem[] = [
   {
     name: 'item',
-    displayName: 'Item',
-    description: 'Household item or possession',
-    extractionKeywords: ['item', 'appliance', 'furniture', 'electronics', 'device'],
+    displayName: 'Inventory Item',
+    description: 'Primary item being documented',
+    extractionKeywords: ['item', 'appliance', 'furniture', 'electronics', 'device', 'equipment'],
     confidenceThreshold: 0.7,
   },
   {
-    name: 'value',
-    displayName: 'Estimated Value',
-    description: 'Purchase price or estimated value',
-    extractionKeywords: ['price', 'cost', 'value', 'worth', 'paid'],
-    confidenceThreshold: 0.6,
+    name: 'identifier',
+    displayName: 'Product Identifier',
+    description: 'Serial number, model number, UPC, SKU - EXACT characters only',
+    extractionKeywords: ['serial', 'S/N', 'model', 'M/N', 'part', 'P/N', 'UPC', 'SKU', 'barcode', 'QR'],
+    confidenceThreshold: 0.9,  // High threshold - only report what you can clearly read
   },
   {
-    name: 'serial_number',
-    displayName: 'Serial Number',
-    description: 'Product serial number or model number',
-    extractionKeywords: ['serial', 'model', 'part number', 'barcode'],
+    name: 'manufacturer',
+    displayName: 'Manufacturer Info',
+    description: 'Brand, make, manufacturer name and country of origin',
+    extractionKeywords: ['brand', 'made by', 'manufactured', 'company', 'logo'],
     confidenceThreshold: 0.8,
+  },
+  {
+    name: 'specs',
+    displayName: 'Technical Specifications',
+    description: 'Dimensions, capacity, power rating, voltage, wattage',
+    extractionKeywords: ['watts', 'volts', 'amps', 'capacity', 'size', 'dimensions', 'weight', 'BTU'],
+    confidenceThreshold: 0.8,
+  },
+  {
+    name: 'date_info',
+    displayName: 'Date Information',
+    description: 'Manufacturing date, purchase date, warranty expiration',
+    extractionKeywords: ['date', 'manufactured', 'MFG', 'warranty', 'expires', 'purchased'],
+    confidenceThreshold: 0.8,
+  },
+  {
+    name: 'condition',
+    displayName: 'Condition Assessment',
+    description: 'Physical state, wear indicators, damage',
+    extractionKeywords: ['new', 'good', 'fair', 'poor', 'damaged', 'worn', 'scratched', 'dented'],
+    confidenceThreshold: 0.7,
   },
   {
     name: 'location',
     displayName: 'Location',
-    description: 'Room or area in home',
-    extractionKeywords: ['room', 'bedroom', 'kitchen', 'living room', 'garage', 'basement'],
+    description: 'Room, area, or storage location within home',
+    extractionKeywords: ['room', 'bedroom', 'kitchen', 'living', 'garage', 'basement', 'closet', 'attic'],
     confidenceThreshold: 0.7,
   },
   {
-    name: 'receipt',
-    displayName: 'Receipt/Documentation',
-    description: 'Proof of purchase or warranty info',
-    extractionKeywords: ['receipt', 'warranty', 'invoice', 'purchase date'],
+    name: 'compliance',
+    displayName: 'Compliance/Safety Info',
+    description: 'UL listing, FCC ID, energy ratings, safety certifications',
+    extractionKeywords: ['UL', 'ETL', 'FCC', 'CE', 'Energy Star', 'rated', 'certified', 'approved'],
+    confidenceThreshold: 0.8,
+  },
+  {
+    name: 'follow_up',
+    displayName: 'Follow-Up Needed',
+    description: 'Label not visible, angle needed, additional photo required',
+    extractionKeywords: ['unclear', 'partial', 'obscured', 'need better', 'retake'],
     confidenceThreshold: 0.6,
   },
 ];
@@ -345,12 +373,14 @@ const genericPrompts = [
 ];
 
 const homeInventoryPrompts = [
-  'Read the serial number and model aloud',
-  'Note the room or location',
-  'Describe the item and its condition',
-  'Photograph any receipts or warranty cards',
-  'Mention the approximate value or purchase date',
-  'Capture brand labels and identifying features',
+  'Read the serial number character by character - S/N colon...',
+  'Read the model number exactly as printed',
+  'Note the brand name and where it\'s displayed',
+  'Describe the condition - any scratches, dents, or wear?',
+  'What room or area is this item located in?',
+  'Check for labels on the back, bottom, or power cord',
+  'Look for manufacturing date or warranty stickers',
+  'Note the voltage and wattage if visible',
 ];
 
 const travelLogPrompts = [
@@ -400,15 +430,45 @@ Provide specific observations for inventory documentation.`;
 const genericVisionPrompt = `Analyze this photo and describe the site conditions,
 notable features, and any observations relevant to environmental or engineering assessment.`;
 
-const homeInventoryVisionPrompt = `Analyze this photo for home inventory documentation.
-Identify and extract:
-- Item type and description (furniture, electronics, appliances, etc.)
-- Visible serial numbers, model numbers, or barcodes
-- Brand/manufacturer if visible
-- Condition assessment (new, good, fair, needs repair)
-- Location context (room type visible in background)
-- Estimated value category if apparent from brand/quality
-Provide specific observations for insurance documentation.`;
+const homeInventoryVisionPrompt = `You are documenting household items for insurance inventory. Your PRIMARY goal is EXACT OCR extraction of all text visible on labels, tags, and screens.
+
+## OCR EXTRACTION RULES (CRITICAL)
+1. **Exact Characters Only**: Report EXACTLY what you see. "SN: ABC-123" not "serial number present"
+2. **Character Confidence**: If a character is unclear, use [?] placeholder: "Model: XK[?]7-2B"
+3. **Preserve Formatting**: Keep original formatting: "Model No. UN55TU7000FXZA" not "Model UN55TU7000FXZA"
+4. **Multiple Labels**: Extract from ALL visible labels, stickers, and screens
+5. **No Guessing**: If you can't read it, say "partially visible" or "obscured"
+
+## LABEL LOCATIONS TO CHECK
+- **Back/rear panel**: Main model plate, serial number sticker
+- **Bottom/underside**: FCC ID, UL listing, manufacturing info
+- **Power cord tag**: Voltage, wattage, cord specs
+- **Screen/display**: Model info, settings screens
+- **Packaging**: If visible - UPC barcode, SKU
+- **Warranty stickers**: Date stamps, service tags
+
+## PHOTO QUALITY ASSESSMENT
+Rate label readability in your description: CLEAR (all text readable) | PARTIAL (some text unclear) | POOR (retake needed)
+If PARTIAL or POOR, specify in suggestedFollowUp exactly what angle/lighting needed.
+
+## STRUCTURED EXTRACTION FORMAT
+For the extractedData field, use pipe-separated key-value pairs:
+"Brand: Samsung | Model: UN55TU7000FXZA | Serial: Z4XT3ABC123456 | MFG Date: 2023-03 | Voltage: 120V 60Hz | Power: 145W"
+
+## WHAT TO CAPTURE (in priority order)
+1. **Identifiers**: Serial number (S/N), Model number (M/N), Part number (P/N), UPC/SKU
+2. **Manufacturer**: Brand name, logo text, country of manufacture
+3. **Specs**: Dimensions, capacity, power rating (volts/amps/watts)
+4. **Dates**: Manufacturing date, warranty period, purchase date (if receipt visible)
+5. **Compliance**: UL, ETL, FCC ID, Energy Star rating, CE mark
+6. **Condition**: Visible wear, damage, scratches, dents, stains
+
+## RESPONSE PRIORITY
+1. Always extract identifiers first - critical for insurance claims
+2. Note what you CAN'T read and why (glare, angle, damage, small print)
+3. Include suggestedFollowUp if important info is not captured
+
+Provide specific observations for insurance documentation and replacement value estimation.`;
 
 const travelLogVisionPrompt = `Analyze this travel photo and describe:
 - Location or landmark identification if recognizable

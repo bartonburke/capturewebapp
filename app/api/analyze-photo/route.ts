@@ -182,6 +182,64 @@ function buildCatalogTags(projectType: ProjectType, hasTranscript: boolean): str
 
    **Documentation:** depth_marker, label, log_sheet, field_notes, measurement`;
 
+    case 'home-inventory':
+      return `   Include ALL relevant tags from these categories:
+
+   **Item Category:**
+   - electronics, tv, computer, laptop, tablet, phone, monitor, speaker, headphones, camera, gaming
+   - appliance, kitchen_appliance, laundry, hvac, refrigerator, washer, dryer, dishwasher, microwave, oven
+   - furniture, seating, table, storage, bed, desk, chair, sofa, cabinet, shelf, bookcase
+   - tools, power_tool, hand_tool, gardening, automotive
+   - clothing, jewelry, watch, accessories, handbag
+   - collectible, art, antique, memorabilia, musical_instrument
+
+   **Location:**
+   - living_room, bedroom, master_bedroom, guest_room, kitchen, bathroom, garage, basement, attic
+   - home_office, closet, laundry_room, dining_room, entryway, patio, shed
+   - mounted, freestanding, built_in, portable
+
+   **Value Tier:**
+   - high_value, medium_value, standard_value, luxury, professional_grade, consumer_grade
+
+   **Condition:**
+   - new, like_new, good, fair, poor, damaged, needs_repair, refurbished
+
+   **OCR/Label Status:**
+   - serial_captured, model_captured, specs_captured
+   - label_clear, label_partial, label_obscured, label_missing
+   - barcode_visible, qr_visible, ocr_successful, ocr_partial, ocr_failed
+   - retake_needed, follow_up_photo
+
+   **Documentation:**
+   - receipt_visible, warranty_visible, manual_visible
+   - packaging_visible, price_tag_visible
+
+   **Insurance Relevance:**
+   - high_replacement_cost, specialized_item, paired_item, set_piece, insured_item`;
+
+    case 'asset-tagging':
+      return `   Include ALL relevant tags from these categories:
+
+   **Asset Type:**
+   - it_equipment, computer, server, network_device, printer, phone_system
+   - furniture, desk, chair, table, cabinet, shelf, workstation
+   - hvac, electrical, plumbing, safety_equipment
+   - tools, machinery, vehicles
+
+   **Location:**
+   - floor, room, zone, rack, building, section, warehouse, office
+
+   **Condition:**
+   - new, good, fair, poor, damaged, needs_repair, decommissioned
+
+   **Identification:**
+   - serial_captured, asset_tag_visible, barcode_scanned, qr_scanned
+   - label_readable, label_partial, label_missing
+
+   **Compliance:**
+   - inspection_current, inspection_due, maintenance_required
+   - safety_compliant, warranty_active`;
+
     case 'generic':
     default:
       return `   Include ALL relevant tags that describe:
