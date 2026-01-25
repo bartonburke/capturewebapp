@@ -1,195 +1,226 @@
-# Claude Context: ChoraGraph Capture PWA
+# ChoraGraph Capture
 
-## Project Overview
-Mobile-first PWA for capturing Phase 1 Environmental Site Assessment (ESA) data on iOS Safari. Combines continuous audio recording, photo capture with GPS, and timestamp correlation for AI-assisted report generation.
+## What Is This?
 
-**Status**: Fully functional prototype with audio recording, GPS-tagged photos, project review, and AI transcription (Phase 1)
+A domain-agnostic field capture system that turns photos into navigable spatial knowledge graphs.
+
+**The core insight:** Photos are **navigation primitives**, not attachments. Instead of documents containing photos as evidence (traditional), photos are entry points into rich, graph-connected data. The map surfaces photos; clicking a photo traverses into everything connected to that place. See [docs/photos-as-navigation-primitives.md](docs/photos-as-navigation-primitives.md) for the full argument.
+
+**Current status:** Fully functional prototype (Phase 2 complete). Captures audio, GPS-tagged photos, AI transcription and vision analysis. Outputs graph-ready "Portable Evidence Packages" for Neo4j ingestion.
+
+**Designed for:** Any workflow where evidence lives at locations — environmental consulting, construction inspections, asset management, personal documentation. Domain logic is defined by conversational schema creation, not hard-coded.
+
+**Platform:** iOS Safari PWA (mobile-first), works offline, syncs on export.
+
+---
+
+## Core Architecture
+
+This capture app is the front-end for a spatial knowledge graph (Neo4j). The following decisions shape everything:
+
+### 1. Photos as Navigation Primitives
+
+The traditional hierarchy (Project → Document → Photo as attachment) is inverted. Photos are the human-legible entry points into the graph. The map surfaces photos; clicking a photo traverses into the underlying data.
+
+### 2. Graph-Shaped from the Start
+
+The Portable Evidence Package outputs data ready for direct Neo4j ingestion, not document-shaped JSON requiring transformation. See [docs/photo-graph-schema.md](docs/photo-graph-schema.md) for the complete schema.
+
+### 3. Locations are First-Class Nodes
+
+Every photo connects to a Location node via `TAKEN_AT`. Locations have hierarchy (country → state → city → site → area → point) and can have hero images for navigation. Zoom level on a map = traversal depth in the graph.
+
+### 4. Entities are Nodes, Tags are Properties
+
+Structured findings (REC, Equipment, Defect) become Entity nodes linked via `SHOWS`. Flat tags (`catalogTags`) remain as searchable properties on Photo nodes.
+
+### 5. Conversational Schema Creation
+
+Entity schemas don't require upfront product definition. A 5-minute conversation with an agent generates the entity types, capture prompts, and vision analysis instructions. Schemas are saved as reusable templates. This enables the long tail of field workflows without product teams scoping each domain.
+
+### 6. Defensibility via Decision Nodes
+
+For regulated industries, every classification decision (human or AI) creates a Decision node with `BASED_ON` links to evidence, `madeBy` provenance, and `OVERRIDES` chains for revision history. Append-only; never mutate. This answers "why did you conclude this?"
+
+### Key Architecture Documents
+
+| Document | Purpose |
+|----------|---------|
+| [photos-as-navigation-primitives.md](docs/photos-as-navigation-primitives.md) | Core concept: photos are entry points, not attachments |
+| [photo-graph-schema.md](docs/photo-graph-schema.md) | Neo4j schema: nodes, relationships, Portable Evidence Package format |
+| [graph-database-briefing.md](docs/graph-database-briefing.md) | Neo4j fundamentals, trade-offs, geospatial capabilities |
+| [SPATIAL-SEARCH-ARCHITECTURE.md](docs/SPATIAL-SEARCH-ARCHITECTURE.md) | 2-day MVP: Neo4j Aura Free, NL→Cypher search API |
+
+### Integration Notes
+
+- This capture app feeds into SimAnalytica's Compass Engine (existing Neo4j spatial graph)
+- Integration pattern with Compass is TBD — likely via shared Location nodes or spatial join at query time
+- The photo subgraph is designed to stand alone initially, then connect
+
+---
+
+## Why This Architecture?
+
+### Problems It Solves
+
+1. **Photos are forgotten.** Field teams capture detailed evidence but never consult it again. The capture intent was good ("I need to remember this"); the retrieval mechanism failed. Spatial retrieval (photos on a map) fixes this — you find photos where you took them.
+
+2. **Schemas are rigid.** Domain software requires upfront product definition. Adding entity types = weeks of scoping. Conversational schema creation lets any user define their workflow in 5 minutes.
+
+3. **Decisions are opaque.** Regulated industries need audit trails: who concluded what, based on what evidence. Traditional systems don't track this. Decision nodes make every classification traceable with full provenance.
+
+### The Bet
+
+Spatial memory (photos) + conversational extensibility (schemas) + graph defensibility (Decision nodes) = a new category. Not domain-specific software, but a configurable spatial memory system for any field evidence work.
+
+---
 
 ## Tech Stack
+
 - **Framework**: Next.js 16 (App Router) + React 19 + TypeScript
 - **Styling**: Tailwind CSS 4
 - **Storage**: IndexedDB (browser-based persistence)
 - **Target Platform**: iOS Safari (PWA mode)
 - **APIs Used**: MediaDevices (camera), Geolocation (GPS), IndexedDB (storage), MediaRecorder (audio), OpenAI Whisper (transcription), Anthropic Claude (analysis)
 
-## Current Implementation Status
+---
 
-### ✅ Completed Features
-- [x] **Projects Management** - Home screen with projects list, create/resume projects
-- [x] **IndexedDB Persistence** - Projects, photos, and audio stored locally with full metadata
-- [x] **GPS Integration** - Real-time GPS tracking with accuracy display, coordinates saved per photo
-- [x] **Continuous Audio Recording** - MediaRecorder captures audio during sessions with pause/resume
-- [x] **Project Review Page** - Photo gallery with swipe navigation and audio playback
-- [x] **Delete Functionality** - Delete projects, photos, and audio with confirmation dialogs
-- [x] **Export Functionality** - Export projects as zip archives with separate media files and JSON metadata
-- [x] **Dynamic Routing** - `/` (projects list) → `/project/[id]` (review) → `/capture/[id]` (capture)
-- [x] Capture UI with session state management (NOT_STARTED → RECORDING → PAUSED → ENDED)
-- [x] Rear camera access with live preview
-- [x] Photo capture with flash feedback + base64 storage
-- [x] Session timer (HH:MM:SS format) and photo/audio counters
-- [x] Pause/Resume with camera/audio stream persistence (no black screen)
-- [x] GPS status indicator (acquiring/active/error with accuracy)
-- [x] GPS coordinates visible on photo thumbnails and fullscreen view
-- [x] Swipe gestures for photo navigation in fullscreen
-- [x] Back navigation throughout app
-- [x] iOS Safari optimizations (safe area handling, no pull-to-refresh, scrolling)
-- [x] PWA manifest for home screen installation
-- [x] **AI Transcription (Phase 1)** - Whisper API integration with OpenAI
-- [x] Process button for audio sessions with progress modal
-- [x] Transcript display with segments, language detection, and duration
-- [x] Processing results stored in IndexedDB with persistence
-- [x] Green "Processed" badge for completed transcriptions
-- [x] **Multi-Project Support** - Project types (Phase I ESA, EIR/EIS, Borehole, Generic)
-- [x] **Launch API** - `/api/v1/capture/launch` for external session creation
-- [x] **Portable Evidence Package v2.0** - Export with vision analysis and entity extraction
-- [x] **Auto-Import to Working Directory** - Export automatically syncs to `evidence/sessions/`
-- [x] **SESSION_SUMMARY.md Generation** - Human/Claude-readable context for each session
+## Implementation Status
 
-### 🚧 Next Up (Phase 2)
-- Photo analysis with Claude Vision API
-- ESA-specific photo descriptions
-- Parallel photo processing with progress tracking
+### Completed Features
 
-### 📋 Planned Features
-- [ ] Phase 2: Claude Vision photo analysis
-- [ ] Phase 3: Timestamp correlation (photos ↔ transcript segments)
-- [ ] Phase 4: Entity extraction (RECs, site features, observations)
-- [ ] Share/download individual photos
-- [ ] On-device computer vision demo
+- **Projects Management** - Home screen with projects list, create/resume projects
+- **IndexedDB Persistence** - Projects, photos, and audio stored locally with full metadata
+- **GPS Integration** - Real-time GPS tracking with accuracy display, coordinates saved per photo
+- **Continuous Audio Recording** - MediaRecorder captures audio during sessions with pause/resume
+- **Project Review Page** - Photo gallery with swipe navigation and audio playback
+- **Delete Functionality** - Delete projects, photos, and audio with confirmation dialogs
+- **Export Functionality** - Export projects as zip archives with separate media files and JSON metadata
+- **Dynamic Routing** - `/` (projects list) → `/project/[id]` (review) → `/capture/[id]` (capture)
+- **Capture UI** - Session state management (NOT_STARTED → RECORDING → PAUSED → ENDED)
+- **Camera** - Rear camera access with live preview, photo capture with flash feedback
+- **Session Controls** - Timer (HH:MM:SS), photo/audio counters, pause/resume with stream persistence
+- **GPS Display** - Status indicator (acquiring/active/error), coordinates on thumbnails and fullscreen
+- **iOS Safari Optimizations** - Safe area handling, no pull-to-refresh, proper scrolling
+- **PWA** - Manifest for home screen installation
+- **AI Transcription** - Whisper API integration with progress modal and transcript display
+- **Multi-Project Support** - Project types: Phase I ESA, EIR/EIS, Borehole, Generic + Personal types (home-inventory, travel-log, personal-todos)
+- **Launch API** - `/api/v1/capture/launch` for external session creation
+- **Portable Evidence Package v2.0** - Export with vision analysis and entity extraction
+- **Auto-Import** - Export automatically syncs to `evidence/sessions/`
+- **SESSION_SUMMARY.md** - Human/Claude-readable context for each session
+- **Vercel Blob Storage** - Large audio files (>4MB) upload to cloud before transcription
+- **Audio-Only Recording** - MediaRecorder uses audio-only stream (10x smaller files)
+- **Photo-Only Processing** - Analyze photos without transcript for legacy oversized audio
+- **Enhanced Vision Analysis** - 11-instruction transcript-aware photo analysis prompts
+- **Session Length Limit** - 4-hour max with 5-minute warning
 
-## Architecture Decisions
+### Next Up (Phase 3)
 
-### Session State Management
-**Decision**: Simple useState with controlled state machine (NOT_STARTED → RECORDING → PAUSED → ENDED)
-**Rationale**: Keeps UI logic simple, easy to reason about transitions
-**Location**: `app/components/CaptureInterface.tsx:8-9`
+- Timestamp correlation (photos ↔ transcript segments)
+- Entity extraction refinement
 
-### Camera Stream Lifecycle
-**Decision**: Keep MediaStream alive during pause, only stop on END or unmount
-**Rationale**: Prevents black screen on resume; tracks stay active during pause
-**Implementation**:
-- `useEffect` with `[sessionState, stream]` dependencies (line 19-30)
-- Separate effect to attach stream to video element (line 32-40)
-- Explicit play/pause video element on pause/resume (line 106-122)
+### Planned
 
-### iOS Safari Bottom Controls
-**Decision**: Use `bottom-24` positioning instead of `bottom-0` with padding
-**Rationale**: Safari's UI bar blocks content at `bottom-0`; moving entire container up ensures full visibility
-**Location**: `app/components/CaptureInterface.tsx:194`
+- Share/download individual photos
+- On-device computer vision demo
 
-### Photo Capture Flow
-**Decision**: Canvas-based capture from video element
-**Rationale**: Works reliably across browsers, allows quality control (JPEG 0.9)
-**Current**: Blob created but not persisted (TODO: IndexedDB)
-**Location**: `app/components/CaptureInterface.tsx:73-104`
+---
 
-### AI Processing Architecture
-**Decision**: Multi-phase processing pipeline with separate API routes
-**Rationale**: Modular design allows independent testing and future optimization
-**Implementation**:
+## Technical Reference
+
+### Implementation Decisions
+
+#### Session State Management
+Simple useState with controlled state machine (NOT_STARTED → RECORDING → PAUSED → ENDED). Keeps UI logic simple, easy to reason about transitions.
+Location: `app/components/CaptureInterface.tsx:8-9`
+
+#### Camera Stream Lifecycle
+Keep MediaStream alive during pause, only stop on END or unmount. Prevents black screen on resume; tracks stay active during pause.
+Location: `app/components/CaptureInterface.tsx:19-40, 106-122`
+
+#### iOS Safari Bottom Controls
+Use `bottom-24` positioning instead of `bottom-0` with padding. Safari's UI bar blocks content at `bottom-0`.
+Location: `app/components/CaptureInterface.tsx:194`
+
+#### Photo Capture Flow
+Canvas-based capture from video element. Works reliably across browsers, allows quality control (JPEG 0.9).
+Location: `app/components/CaptureInterface.tsx:73-104`
+
+#### AI Processing Architecture
+Multi-phase processing pipeline with separate API routes:
 - Phase 1: Whisper transcription via `/api/transcribe-audio`
-- Phase 2: Claude Vision analysis via `/api/analyze-photo` (pending)
-- Phase 3: Timestamp correlation in client-side utility
-- Phase 4: Entity extraction via `/api/extract-entities` (pending)
-**Storage**: ProcessingResult objects in IndexedDB v3 with sessionId indexing
-**Location**: `app/project/[projectId]/page.tsx:186-268`
+- Phase 2: Claude Vision analysis via `/api/analyze-photo`
+- Phase 3: Timestamp correlation (client-side)
+- Phase 4: Entity extraction via `/api/extract-entities`
 
-## File Structure
+ProcessingResult objects stored in IndexedDB v4 with sessionId indexing.
+
+### File Structure
+
 ```
 app/
 ├── api/
-│   ├── transcribe-audio/
-│   │   └── route.ts             # Whisper API endpoint for audio transcription
+│   ├── transcribe-audio/route.ts    # Whisper API endpoint
+│   ├── analyze-photo/route.ts       # Claude Vision endpoint
+│   ├── upload-audio/route.ts        # Vercel Blob upload
 │   └── v1/capture/
-│       ├── launch/
-│       │   └── route.ts         # Launch API - create sessions externally
-│       └── import/
-│           └── route.ts         # Import API - receive exported packages
+│       ├── launch/route.ts          # External session creation
+│       └── import/route.ts          # Receive exported packages
 ├── lib/
-│   ├── types.ts                 # TypeScript interfaces (Project, Photos, Audio, Processing types)
-│   ├── db.ts                    # IndexedDB v4 utilities (CRUD for projects/photos/audio/processing)
-│   ├── export.ts                # Export utilities (zip generation, file conversion)
-│   └── defaultContexts.ts       # Default entity schemas per project type
+│   ├── types.ts                     # TypeScript interfaces
+│   ├── db.ts                        # IndexedDB v4 utilities
+│   ├── export.ts                    # Export utilities (zip, conversion)
+│   └── defaultContexts.ts           # Entity schemas per project type
 ├── components/
-│   ├── CaptureInterface.tsx     # Camera/audio capture UI (~700 lines)
-│   ├── ProjectsList.tsx         # Projects home screen with delete (~190 lines)
-│   └── CreateProjectModal.tsx   # Create project form (~110 lines)
-├── capture/[projectId]/
-│   └── page.tsx                 # Dynamic route for capture interface
-├── project/[projectId]/
-│   └── page.tsx                 # Project review page with AI processing (~595 lines)
-├── session/[sessionId]/
-│   └── page.tsx                 # Handle launched sessions from external API
-├── globals.css                  # iOS-optimized mobile styles
-├── layout.tsx                   # Root layout with PWA meta tags
-└── page.tsx                     # Entry point (renders ProjectsList)
+│   ├── CaptureInterface.tsx         # Camera/audio capture UI (~700 lines)
+│   ├── ProjectsList.tsx             # Projects home screen (~190 lines)
+│   └── CreateProjectModal.tsx       # Create project form (~110 lines)
+├── capture/[projectId]/page.tsx     # Capture interface route
+├── project/[projectId]/page.tsx     # Project review page (~595 lines)
+├── session/[sessionId]/page.tsx     # Handle launched sessions
+├── globals.css                      # iOS-optimized mobile styles
+├── layout.tsx                       # Root layout with PWA meta tags
+└── page.tsx                         # Entry point (renders ProjectsList)
 
-evidence/
-└── sessions/                    # Imported field capture sessions
-    └── {sessionId}/
-        ├── index.json           # Complete metadata
-        ├── SESSION_SUMMARY.md   # Human/Claude readable summary
-        ├── session-audio.webm   # Audio file
-        ├── transcript.txt       # Plain text transcript
-        └── photos/              # Photo files
-
+evidence/sessions/                   # Imported field capture sessions
 public/
-├── manifest.json                # PWA configuration
-└── icon.svg                     # App icon (camera design)
-
-PRD.md                           # Full product requirements
-TESTING.md                       # iOS testing guide
-CLAUDE.md                        # This file - context for AI assistants
+├── manifest.json                    # PWA configuration
+└── icon.svg                         # App icon
 ```
 
-## Data Model
+### Data Model
 
-### TypeScript Interfaces (`app/lib/types.ts`)
 ```typescript
 interface Project {
   id: string;              // UUID
-  name: string;            // e.g., "123 Main St ESA"
-  lead: string;            // Project lead name
-  notes?: string;          // Optional notes
+  name: string;
+  lead: string;
+  notes?: string;
   createdAt: string;       // ISO8601
-  modifiedAt: string;      // ISO8601
-  photoCount: number;      // Total photos
-  audioCount: number;      // Total audio recordings
-}
-
-interface GpsCoordinates {
-  latitude: number;
-  longitude: number;
-  accuracy: number;        // meters
-  timestamp: number;       // Unix timestamp
+  modifiedAt: string;
+  photoCount: number;
+  audioCount: number;
 }
 
 interface PhotoMetadata {
-  id: string;              // UUID
-  timestamp: string;       // ISO8601
-  projectId: string;       // Links to parent project
+  id: string;
+  timestamp: string;
+  projectId: string;
   gps: GpsCoordinates | null;
-  imageData: string;       // Base64 encoded JPEG
-  sessionTimestamp: number;  // Session duration when captured
+  imageData: string;       // Base64 JPEG
+  sessionTimestamp: number;
 }
 
 interface AudioMetadata {
-  id: string;              // UUID
-  projectId: string;       // Links to parent project
-  sessionId: string;       // Groups recordings from same session
-  audioData: string;       // Base64 encoded audio (webm/mp4)
-  duration: number;        // Recording duration in seconds
-  mimeType: string;        // audio/webm or audio/mp4
-  timestamp: string;       // ISO8601
-  fileSize: number;        // Bytes
-}
-
-// AI Processing Types (added in Phase 1)
-interface Transcript {
-  fullText: string;
-  segments: TranscriptSegment[];
-  language?: string;
+  id: string;
+  projectId: string;
+  sessionId: string;
+  audioData: string;       // Base64 webm/mp4
   duration: number;
+  mimeType: string;
+  timestamp: string;
+  fileSize: number;
 }
 
 interface ProcessingResult {
@@ -200,18 +231,54 @@ interface ProcessingResult {
   status: 'processing' | 'completed' | 'failed';
   error?: string;
   transcript: Transcript;
-  photoAnalyses: PhotoAnalysis[];  // Phase 2
-  entities: ExtractedEntity[];     // Phase 4
+  photoAnalyses: PhotoAnalysis[];
+  entities: ExtractedEntity[];
 }
 ```
 
-### IndexedDB Schema (`choragraph-capture` database, version 3)
-- **projects** store - Projects with keyPath `id`, indexed by `modifiedAt`
-- **photos** store - Photos with keyPath `id`, indexed by `projectId` and `timestamp`
-- **audio** store - Audio recordings with keyPath `id`, indexed by `projectId`, `sessionId`, and `timestamp`
-- **processing_results** store - AI processing results with keyPath `id`, indexed by `projectId`, `sessionId`, and `status`
+**IndexedDB Schema** (`choragraph-capture`, version 4):
+- **projects** - keyPath `id`, indexed by `modifiedAt`
+- **photos** - keyPath `id`, indexed by `projectId`, `timestamp`
+- **audio** - keyPath `id`, indexed by `projectId`, `sessionId`, `timestamp`
+- **processing_results** - keyPath `id`, indexed by `projectId`, `sessionId`, `status`
 
-## Development Workflow
+### Key Code Patterns
+
+#### Camera Stream Management
+```typescript
+// Always check stream exists and is active before operations
+if (stream && videoRef.current) {
+  videoRef.current.srcObject = stream;
+  videoRef.current.play().catch(err => console.error(err));
+}
+```
+
+#### iOS Safe Areas
+```typescript
+// Use bottom offset instead of padding for controls
+className="absolute bottom-24 left-0 right-0"  // 96px from bottom
+```
+
+#### GPS Tracking
+```typescript
+const initializeGps = () => {
+  watchIdRef.current = navigator.geolocation.watchPosition(
+    (position) => setCurrentGps({ lat, lng, accuracy, timestamp }),
+    (error) => handleGpsError(error),
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+  );
+};
+
+const stopGps = () => {
+  if (watchIdRef.current) {
+    navigator.geolocation.clearWatch(watchIdRef.current);
+  }
+};
+```
+
+---
+
+## Development
 
 ### Local Development
 ```bash
@@ -229,206 +296,35 @@ ngrok http 3000
 
 Use ngrok HTTPS URL on iPhone Safari, then add to home screen for PWA mode.
 
-## Known Issues / Limitations
+### Known Issues
 
 1. **Camera & GPS Permissions**: Require HTTPS on iOS. Use ngrok for local dev.
 2. **Node Version**: Requires Node 20.9.0+ (Next.js 16 requirement)
-3. **Base64 Storage**: Photos and audio stored as base64 - may impact performance with large projects
+3. **Base64 Storage**: Photos and audio stored as base64 — may impact performance with large projects
 4. **Private Browsing**: IndexedDB unavailable in Safari private mode
 
-## Key Code Patterns
+### Testing Checklist
 
-### Adding New State
-```typescript
-// Add to component state
-const [newState, setNewState] = useState<Type>(initialValue);
+**Critical paths to verify:**
+- [ ] Camera preview loads (rear camera on iOS)
+- [ ] GPS acquires and shows accuracy
+- [ ] Photo capture saves with GPS coordinates
+- [ ] Audio recording starts/pauses/resumes correctly
+- [ ] Session end saves audio and shows summary
+- [ ] Process button triggers transcription successfully
+- [ ] Export creates downloadable zip
+- [ ] PWA mode works from home screen
 
-// Update in handlers
-const handleSomething = () => {
-  setNewState(newValue);
-};
-```
+### Git Workflow
 
-### Camera Stream Management
-```typescript
-// Always check stream exists and is active before operations
-if (stream && videoRef.current) {
-  videoRef.current.srcObject = stream;
-  videoRef.current.play().catch(err => console.error(err));
-}
-```
-
-### iOS Safe Areas
-```typescript
-// Use bottom offset instead of padding for controls
-className="absolute bottom-24 left-0 right-0"  // 96px from bottom
-```
-
-### GPS Tracking Pattern
-```typescript
-// Initialize GPS on session start
-const initializeGps = () => {
-  watchIdRef.current = navigator.geolocation.watchPosition(
-    (position) => setCurrentGps({ lat, lng, accuracy, timestamp }),
-    (error) => handleGpsError(error),
-    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-  );
-};
-
-// Stop GPS on session end or unmount
-const stopGps = () => {
-  if (watchIdRef.current) {
-    navigator.geolocation.clearWatch(watchIdRef.current);
-  }
-};
-```
-
-### IndexedDB Photo Storage
-```typescript
-// Convert blob to base64, save with GPS metadata
-canvas.toBlob(async (blob) => {
-  const reader = new FileReader();
-  reader.onloadend = async () => {
-    const photoMetadata: PhotoMetadata = {
-      id: crypto.randomUUID(),
-      projectId: project.id,
-      gps: currentGps ? { ...currentGps } : null,
-      imageData: reader.result as string,
-      timestamp: new Date().toISOString(),
-      sessionTimestamp: duration
-    };
-    await savePhoto(photoMetadata);
-    await updateProject({ ...project, photoCount: project.photoCount + 1 });
-  };
-  reader.readAsDataURL(blob);
-}, 'image/jpeg', 0.9);
-```
-
-### Delete Operations Pattern
-```typescript
-// Cascading delete - remove project and all associated data
-export async function deleteProject(projectId: string): Promise<void> {
-  const db = await initDB();
-
-  // Delete all photos
-  const photos = await getProjectPhotos(projectId);
-  for (const photo of photos) {
-    await deletePhoto(photo.id);
-  }
-
-  // Delete all audio
-  const audio = await getProjectAudio(projectId);
-  for (const audioRecord of audio) {
-    await deleteAudio(audioRecord.id);
-  }
-
-  // Delete project itself
-  const tx = db.transaction('projects', 'readwrite');
-  await tx.objectStore('projects').delete(projectId);
-}
-```
-
-### Export Pattern
-```typescript
-// Export project as zip with separate files
-const zipBlob = await exportProject(project, photos, audio);
-const filename = generateExportFilename(project.name);
-downloadBlob(zipBlob, filename);
-
-// Zip structure:
-// project-name-2026-01-09.zip
-// ├── project.json (metadata without base64)
-// ├── photos/
-// │   ├── photo-001-timestamp.jpg
-// │   └── ...
-// └── audio/
-//     ├── audio-001-session-id.webm
-//     └── ...
-```
-
-## Testing Checklist
-
-### Projects Workflow
-- [ ] Projects list loads on home screen
-- [ ] Create new project modal (name, lead, notes)
-- [ ] New project navigates to capture interface
-- [ ] Select existing project resumes capture
-- [ ] Project photo count updates after capture
-- [ ] Back button returns to projects list
-- [ ] Data persists after page refresh
-
-### Capture Interface
-- [x] Camera preview loads (rear camera)
-- [x] GPS indicator appears (yellow → green with accuracy)
-- [x] Photo capture works (flash + count increment + IndexedDB save)
-- [x] Photos save with GPS coordinates (check console log)
-- [x] GPS denied/unavailable → photos still work (gps: null)
-- [x] Audio recording starts/pauses/resumes with session
-- [x] Audio chunks collected and saved on session end
-- [x] Pause stops timer, disables capture button, pauses audio
-- [x] Resume keeps camera/audio live, re-enables capture
-- [x] End session stops camera/audio/GPS, shows summary, saves audio
-- [x] All buttons tappable above Safari bar
-
-### Project Review Page
-- [x] Project details page loads with correct stats
-- [x] Photo gallery displays all photos in 2-column grid
-- [x] GPS coordinates visible on photo thumbnails
-- [x] Click photo to view fullscreen
-- [x] Swipe left/right to navigate between photos
-- [x] Arrow buttons work for photo navigation
-- [x] GPS metadata shown in fullscreen footer
-- [x] Audio recordings section displays all sessions
-- [x] Audio playback works on iOS Safari
-- [x] Page scrolls properly to see all content
-- [x] Resume button navigates to capture interface
-- [x] Back button returns to projects list
-
-### AI Processing (Phase 1)
-- [x] Purple "Process" button appears on unprocessed audio
-- [x] Processing modal shows with animated progress bar
-- [x] Whisper API transcribes audio successfully
-- [x] Transcript displays with full text, segments, and language
-- [x] Green "Processed" badge appears after completion
-- [x] Results persist in IndexedDB and survive page refresh
-- [x] Error handling for rate limits and API failures
-
-### iOS Safari Specific
-- [ ] HTTPS via ngrok for camera + GPS permissions
-- [ ] GPS permission prompt appears on session start
-- [ ] Location Services settings respected
-- [ ] PWA mode (add to home screen) works
-- [ ] No pull-to-refresh interference
-
-## Next Session Goals
-1. **Phase 2 - Photo Analysis**: Implement Claude Vision API for ESA-specific photo descriptions
-2. **Phase 3 - Timestamp Correlation**: Match photos to transcript segments by timestamp
-3. **Phase 4 - Entity Extraction**: Extract RECs, site features, and observations with Claude
-
-## Useful Context for AI Assistants
-
-- **Always test on iOS**: Desktop behavior differs significantly (front camera, no safe area issues)
-- **Camera permissions strict**: getUserMedia requires HTTPS or localhost
-- **State machine is critical**: Don't break NOT_STARTED → RECORDING → PAUSED → ENDED flow
-- **Stream lifecycle matters**: Stopping tracks during pause causes black screen on resume
-- **Bottom controls positioning**: Safari UI bar covers `bottom-0`; use `bottom-24` or higher
-
-## Git Workflow
 - Commit after each feature milestone
-- Use descriptive commit messages with feature lists
-- Include testing notes in commits
-- Co-author with Claude: `Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>`
-
-## References
-- PRD: Full product vision and architecture
-- TESTING.md: iOS testing setup and checklist
-- Data Model (PRD line 156-191): JSON structure for session data
+- Use descriptive commit messages
+- Co-author: `Co-Authored-By: Claude <noreply@anthropic.com>`
 
 ---
 
-## Field Session Data (Imported from Mobile Capture)
+## Appendix: Working with Field Session Data
 
-### Location
 Field capture sessions are automatically imported to `evidence/sessions/{sessionId}/` when exported from the mobile PWA.
 
 ### Directory Structure
@@ -436,22 +332,21 @@ Field capture sessions are automatically imported to `evidence/sessions/{session
 evidence/sessions/{sessionId}/
 ├── index.json              # Complete metadata (Portable Evidence Package v2.0)
 ├── SESSION_SUMMARY.md      # Human/Claude readable summary - START HERE
-├── session-audio.webm      # Audio recording from field session
+├── session-audio.webm      # Audio recording
 ├── transcript.txt          # Plain text transcript (if processed)
 └── photos/
     ├── 001-interior-wall.jpg
-    ├── 002-ust-removal.jpg
     └── ...
 ```
 
-### Working with Field Sessions
+### Working with Sessions
 
-**To find available field sessions:**
+**Find available sessions:**
 ```bash
 ls -la evidence/sessions/
 ```
 
-**To get context about a session, read the SESSION_SUMMARY.md:**
+**Get context about a session:**
 ```bash
 cat evidence/sessions/{sessionId}/SESSION_SUMMARY.md
 ```
@@ -460,13 +355,14 @@ cat evidence/sessions/{sessionId}/SESSION_SUMMARY.md
 - Project name, type, and capture timestamp
 - Photo count, audio duration, transcript availability
 - GPS coordinates of capture location
-- Extracted entities (Conditions, Features, AOCs)
+- Extracted entities
 - Transcript excerpt
-- Photo observations with REC potential ratings
+- Photo observations
 
 ### Key Fields in index.json
-- `session_id`: Unique identifier for the capture session
-- `project_type`: "phase1-esa", "eir-eis", "borehole", or "generic"
+
+- `session_id`: Unique identifier
+- `project_type`: "phase1-esa", "eir-eis", "borehole", "asset-tagging", "generic", "home-inventory", "travel-log", "personal-todos"
 - `photos[]`: Array with filename, GPS, timestamp, vision_analysis, tags
 - `transcript`: Full text and segments with timestamps
 - `session_summary.entities_extracted`: Count by entity type
@@ -474,22 +370,7 @@ cat evidence/sessions/{sessionId}/SESSION_SUMMARY.md
 
 ### Common Tasks
 
-**Summarize a field session:**
-1. Read `evidence/sessions/{sessionId}/SESSION_SUMMARY.md`
-2. Reference specific photos in `photos/` directory
-3. Quote relevant portions of transcript from `transcript.txt`
-
-**Analyze photos for environmental concerns:**
-1. View photos in `photos/` directory
-2. Check `index.json` for existing `vision_analysis` per photo
-3. Note `rec_potential` ratings (high/medium/low/none)
-
-**Find all high-REC observations:**
-```bash
-grep -r "rec_potential.*high" evidence/sessions/*/index.json
-```
-
-**List all sessions with their project types:**
+**List all sessions with project types:**
 ```bash
 for dir in evidence/sessions/*/; do
   if [ -f "$dir/index.json" ]; then
@@ -500,55 +381,4 @@ done
 
 ---
 
-**Last Updated**: 2026-01-11
-**Current Status**: Phase 1 (AI Transcription) complete and tested
-
-## Session Summary (2026-01-11) - Phase 1: AI Transcription
-
-### Completed Today
-1. ✅ **Dependencies** - Installed `openai` and `@anthropic-ai/sdk` packages
-2. ✅ **Environment Setup** - Created `.env.local` with API keys for OpenAI and Anthropic
-3. ✅ **Type System** - Extended `app/lib/types.ts` with AI processing interfaces (Transcript, ProcessingResult, ProcessingProgress)
-4. ✅ **Database Upgrade** - IndexedDB v2 → v3 with `processing_results` store
-5. ✅ **Transcription API** - Created `/app/api/transcribe-audio/route.ts` with Whisper integration
-6. ✅ **Process UI** - Added purple "Process" button and animated progress modal
-7. ✅ **Transcript Display** - Shows full text, segments, language, and duration
-8. ✅ **State Management** - Processing results stored in IndexedDB with sessionId indexing
-9. ✅ **Testing** - Successfully transcribed real audio from captured sessions
-
-### Key Files Modified
-- `app/lib/types.ts` - Added AI processing types (lines 44-119)
-- `app/lib/db.ts` - Upgraded to v3, added processing_results CRUD operations
-- `app/api/transcribe-audio/route.ts` - New Whisper API endpoint (146 lines)
-- `app/project/[projectId]/page.tsx` - Added processing UI and handlers (~595 lines)
-- `.env.local` - Created with OpenAI and Anthropic API keys
-
-### Testing Status
-Phase 1 fully tested and working:
-- ✅ Process button triggers transcription
-- ✅ Progress modal with animated indicators
-- ✅ Whisper API transcribes audio successfully
-- ✅ Transcript displays with full metadata
-- ✅ Results persist in IndexedDB
-- ✅ Green "Processed" badge after completion
-- ✅ Rate limit errors handled gracefully
-
-### Architecture Notes
-- **Modular API Routes**: Each processing phase has its own API endpoint
-- **Client-Side Orchestration**: Main processing logic in page component
-- **IndexedDB v3**: Separate store for processing results with proper indexing
-- **Progress Tracking**: Real-time UI updates during multi-step processing
-
-## Previous Session Summary (2026-01-09)
-
-### Completed
-1. ✅ **Audio Recording** - Full MediaRecorder integration with pause/resume lifecycle
-2. ✅ **Project Review Page** - Photo gallery with GPS display and audio playback
-3. ✅ **Swipe Navigation** - Touch gestures for navigating between photos
-4. ✅ **Bug Fixes** - Fixed stale project prop causing incorrect photo/audio counts
-5. ✅ **UI Improvements** - GPS coordinates on thumbnails, scrolling fixes, navigation arrows
-
-### Key Commits
-- `67ef5ac` - Fix stale project prop causing incorrect photo/audio counts
-- `22fdfd9` - Add project details/review page with photo gallery and audio playback
-- `3a131e3` - Fix scrolling, add swipe navigation, and show GPS on photo thumbnails
+**Last Updated**: 2026-01-25

@@ -143,8 +143,12 @@ export interface PhotoAnalysis {
 }
 
 // Photo-specific entity (simpler than ExtractedEntity for Phase 4)
+// Entity types are dynamic based on project type - these are the common ones
 export interface PhotoEntity {
-  type: 'REC' | 'AOC' | 'Feature' | 'Equipment' | 'Condition' | 'ActionItem' | 'Question' | 'Observation';
+  type: string;  // Dynamic based on project entitySchema + transcript-derived types
+  // Common types: 'REC' | 'AOC' | 'Feature' | 'Equipment' | 'Condition'
+  // Home inventory: 'item' | 'identifier' | 'manufacturer' | 'specs' | 'date_info' | 'condition' | 'location' | 'compliance' | 'follow_up'
+  // Transcript-derived: 'ActionItem' | 'Question' | 'Observation'
   description: string;
   severity: 'high' | 'medium' | 'low' | 'info';
   recommendation?: string;

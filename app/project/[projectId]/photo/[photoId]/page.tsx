@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { PhotoMetadata, ProcessingResult, PhotoAnalysis, Project } from '@/app/lib/types';
 import { getProject, getProjectPhotos, getProjectAudio } from '@/app/lib/db';
@@ -18,6 +18,15 @@ export default function PhotoDetailPage() {
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+
+  // Carousel navigation state
+  const [allPhotos, setAllPhotos] = useState<PhotoMetadata[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  // Swipe gesture state
+  const touchStartX = useRef<number>(0);
+  const touchEndX = useRef<number>(0);
+  const minSwipeDistance = 50;
 
   // Override global overflow: hidden for this page
   useEffect(() => {
@@ -44,7 +53,16 @@ export default function PhotoDetailPage() {
 
       // Get all photos for this project to find the one we want
       const photos = await getProjectPhotos(projectId);
-      const currentPhoto = photos.find(p => p.id === photoId);
+
+      // Sort photos by timestamp (oldest first) for consistent ordering
+      const sortedPhotos = [...photos].sort((a, b) =>
+        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      );
+      setAllPhotos(sortedPhotos);
+
+      // Find current photo index
+      const index = sortedPhotos.findIndex(p => p.id === photoId);
+      const currentPhoto = index >= 0 ? sortedPhotos[index] : null;
 
       if (!currentPhoto) {
         console.error('Photo not found');
@@ -52,8 +70,9 @@ export default function PhotoDetailPage() {
         return;
       }
 
+      setCurrentIndex(index);
       setPhoto(currentPhoto);
-      console.log('[PhotoDetail] Found photo:', currentPhoto.id);
+      console.log('[PhotoDetail] Found photo:', currentPhoto.id, `(${index + 1} of ${sortedPhotos.length})`);
 
       // Load processing results to find photo analysis
       const audio = await getProjectAudio(projectId);
@@ -142,6 +161,51 @@ export default function PhotoDetailPage() {
     }
   };
 
+  // Navigation functions
+  const navigateToPhoto = useCallback((index: number) => {
+    if (index >= 0 && index < allPhotos.length) {
+      const targetPhoto = allPhotos[index];
+      // Use replace to avoid building up a long history stack
+      router.replace(`/project/${projectId}/photo/${targetPhoto.id}`);
+    }
+  }, [allPhotos, projectId, router]);
+
+  const goToPrevious = useCallback(() => {
+    if (currentIndex > 0) {
+      navigateToPhoto(currentIndex - 1);
+    }
+  }, [currentIndex, navigateToPhoto]);
+
+  const goToNext = useCallback(() => {
+    if (currentIndex < allPhotos.length - 1) {
+      navigateToPhoto(currentIndex + 1);
+    }
+  }, [currentIndex, allPhotos.length, navigateToPhoto]);
+
+  // Swipe handlers
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartX.current = e.targetTouches[0].clientX;
+    touchEndX.current = e.targetTouches[0].clientX;
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    touchEndX.current = e.targetTouches[0].clientX;
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    const swipeDistance = touchStartX.current - touchEndX.current;
+
+    if (Math.abs(swipeDistance) > minSwipeDistance) {
+      if (swipeDistance > 0) {
+        // Swiped left -> go to next photo
+        goToNext();
+      } else {
+        // Swiped right -> go to previous photo
+        goToPrevious();
+      }
+    }
+  }, [goToNext, goToPrevious]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
@@ -160,10 +224,10 @@ export default function PhotoDetailPage() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      {/* Header with Back Button */}
+      {/* Header with Back Button and Photo Count */}
       <div className="flex items-center justify-between p-4 bg-black/90 sticky top-0 z-10">
         <button
-          onClick={() => router.back()}
+          onClick={() => router.push(`/project/${projectId}`)}
           className="flex items-center gap-2 text-blue-400 hover:text-blue-300"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -171,19 +235,54 @@ export default function PhotoDetailPage() {
           </svg>
           Back
         </button>
-        <div className="text-sm text-gray-400">Photo Details</div>
+        <div className="text-sm text-gray-400 font-medium">
+          {allPhotos.length > 0 ? `${currentIndex + 1} of ${allPhotos.length}` : 'Photo Details'}
+        </div>
+        {/* Spacer to center the photo count */}
+        <div className="w-16"></div>
       </div>
 
-      {/* Photo */}
-      <div className="w-full">
+      {/* Photo with Swipe and Navigation */}
+      <div
+        className="w-full relative"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
         <img
           src={photo.imageData}
           alt="Photo"
           className="w-full"
         />
+
+        {/* Previous Button */}
+        {currentIndex > 0 && (
+          <button
+            onClick={goToPrevious}
+            className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 flex items-center justify-center text-white hover:bg-black/70 transition-colors"
+            aria-label="Previous photo"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+        )}
+
+        {/* Next Button */}
+        {currentIndex < allPhotos.length - 1 && (
+          <button
+            onClick={goToNext}
+            className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 flex items-center justify-center text-white hover:bg-black/70 transition-colors"
+            aria-label="Next photo"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        )}
       </div>
 
-      {/* REC Potential Banner - Displayed prominently below photo */}
+      {/* Findings Summary Banner - Displayed prominently below photo */}
       {analysis && (
         <div className={`px-4 py-3 ${
           analysis.entities?.some(e => e.severity === 'high')
@@ -200,14 +299,14 @@ export default function PhotoDetailPage() {
                 <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
               <span className="font-semibold text-white">
-                REC Potential: {
+                {project?.projectType === 'phase1-esa' ? 'REC Potential' : 'Priority'}: {
                   analysis.entities?.some(e => e.severity === 'high')
                     ? 'High'
                     : analysis.entities?.some(e => e.severity === 'medium')
                     ? 'Medium'
                     : analysis.entities?.some(e => e.severity === 'low')
                     ? 'Low'
-                    : 'None Identified'
+                    : 'Info'
                 }
               </span>
             </div>
@@ -255,7 +354,7 @@ export default function PhotoDetailPage() {
         {analysis && analysis.entities && analysis.entities.length > 0 && (
           <div className="pb-4 border-b border-gray-700">
             <div className="text-xs font-semibold text-gray-400 uppercase mb-3">
-              Environmental Findings
+              {project?.projectType === 'phase1-esa' || project?.projectType === 'eir-eis' ? 'Environmental Findings' : 'Findings'}
             </div>
             <div className="space-y-3">
               {analysis.entities.map((entity, i) => (
@@ -332,6 +431,22 @@ export default function PhotoDetailPage() {
                     <div className="mt-2 p-2 bg-cyan-900/20 rounded">
                       <span className="text-xs text-cyan-400 font-medium">AI Response: </span>
                       <span className="text-sm text-cyan-200">{entity.aiResponse}</span>
+                    </div>
+                  )}
+
+                  {/* Show extracted data (OCR results, measurements, etc.) */}
+                  {entity.extractedData && (
+                    <div className="mt-2 p-2 bg-green-900/20 rounded border border-green-800/50">
+                      <span className="text-xs text-green-400 font-medium block mb-1">📋 Extracted Data:</span>
+                      <span className="text-sm text-green-200 font-mono">{entity.extractedData}</span>
+                    </div>
+                  )}
+
+                  {/* Show suggested follow-up if label wasn't fully captured */}
+                  {entity.suggestedFollowUp && (
+                    <div className="mt-2 p-2 bg-yellow-900/20 rounded border border-yellow-800/50">
+                      <span className="text-xs text-yellow-400 font-medium">📸 Follow-up needed: </span>
+                      <span className="text-sm text-yellow-200">{entity.suggestedFollowUp}</span>
                     </div>
                   )}
 
