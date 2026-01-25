@@ -3,9 +3,10 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Project, PhotoMetadata, AudioMetadata, ProcessingResult, Transcript, TranscriptSegment, PhotoAnalysis, ProcessingProgress } from '../../lib/types';
-import { getProject, getProjectPhotos, getProjectAudio, deletePhoto, deleteAudio, updateProject, deleteProject, deleteLaunchSession, saveProcessingResult, getSessionProcessingResult } from '../../lib/db';
+import { getProject, getProjectPhotos, getProjectAudio, deletePhoto, deleteAudio, updateProject, deleteProject, deleteLaunchSession, saveProcessingResult, getSessionProcessingResult, savePhoto } from '../../lib/db';
 import { downloadBlob, exportPortableEvidencePackage, generatePortableFilename } from '../../lib/export';
 import { findMatchingSegment } from '../../lib/correlation';
+import { extractExifData, fileToBase64 } from '../../lib/exif';
 
 export default function ProjectDetailsPage() {
   const params = useParams();
@@ -30,10 +31,13 @@ export default function ProjectDetailsPage() {
   const [processingResult, setProcessingResult] = useState<ProcessingResult | null>(null);
   const [processingError, setProcessingError] = useState<string | null>(null);
   const [showAudioTooLargeDialog, setShowAudioTooLargeDialog] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
 
-  // Touch handling for swipe
+  // Refs
   const touchStartX = useRef<number>(0);
   const touchEndX = useRef<number>(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadProjectData();
@@ -380,6 +384,64 @@ export default function ProjectDetailsPage() {
     }
   };
 
+  const handleUploadPhotos = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0 || !project) return;
+
+    setIsUploading(true);
+    setUploadProgress({ current: 0, total: files.length });
+
+    try {
+      const newPhotos: PhotoMetadata[] = [];
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        setUploadProgress({ current: i + 1, total: files.length });
+
+        // Extract EXIF data (GPS, timestamp)
+        const exifData = await extractExifData(file);
+
+        // Convert to base64
+        const imageData = await fileToBase64(file);
+
+        // Create photo metadata
+        const photoMetadata: PhotoMetadata = {
+          id: crypto.randomUUID(),
+          projectId: project.id,
+          gps: exifData.gps,
+          compass: null, // Uploaded photos don't have compass data
+          imageData,
+          timestamp: exifData.timestamp || new Date().toISOString(),
+          sessionTimestamp: 0, // Uploaded photos don't have session timestamps
+        };
+
+        // Save to IndexedDB
+        await savePhoto(photoMetadata);
+        newPhotos.push(photoMetadata);
+      }
+
+      // Update local state
+      setPhotos(prev => [...newPhotos, ...prev]);
+
+      // Update project photo count
+      const updatedProject = { ...project, photoCount: project.photoCount + newPhotos.length };
+      await updateProject(updatedProject);
+      setProject(updatedProject);
+
+      console.log(`[Upload] Successfully uploaded ${newPhotos.length} photos`);
+    } catch (error) {
+      console.error('Failed to upload photos:', error);
+      alert('Failed to upload some photos. Please try again.');
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(null);
+      // Reset input so same files can be selected again
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
   const handleDeleteProject = async () => {
     if (!project) return;
 
@@ -664,10 +726,44 @@ export default function ProjectDetailsPage() {
           </section>
         )}
 
+        {/* Hidden file input for photo upload */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={handleUploadPhotos}
+          className="hidden"
+        />
+
         {/* Photos Section */}
         {photos.length > 0 ? (
           <section className="pb-6">
-            <h2 className="text-white font-semibold text-lg mb-4">Photos</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-white font-semibold text-lg">Photos</h2>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5"
+              >
+                {isUploading ? (
+                  <>
+                    <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    {uploadProgress ? `${uploadProgress.current}/${uploadProgress.total}` : 'Uploading...'}
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                    Upload
+                  </>
+                )}
+              </button>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               {photos.map((photo, index) => (
                 <button
@@ -703,18 +799,53 @@ export default function ProjectDetailsPage() {
             </div>
           </section>
         ) : (
-          <div className="text-center text-gray-400 py-12">
-            <svg className="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            <p>No photos captured yet</p>
-            <button
-              onClick={() => router.push(`/capture/${projectId}`)}
-              className="mt-4 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors"
-            >
-              Start Capturing
-            </button>
-          </div>
+          <section className="pb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-white font-semibold text-lg">Photos</h2>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5"
+              >
+                {isUploading ? (
+                  <>
+                    <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    {uploadProgress ? `${uploadProgress.current}/${uploadProgress.total}` : 'Uploading...'}
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                    Upload
+                  </>
+                )}
+              </button>
+            </div>
+            <div className="text-center text-gray-400 py-12 bg-gray-800/50 rounded-lg border border-gray-700">
+              <svg className="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <p>No photos captured yet</p>
+              <div className="flex gap-2 justify-center mt-4">
+                <button
+                  onClick={() => router.push(`/capture/${projectId}`)}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors"
+                >
+                  Start Capturing
+                </button>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
+                >
+                  Upload Photos
+                </button>
+              </div>
+            </div>
+          </section>
         )}
       </div>
 

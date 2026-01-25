@@ -9,12 +9,9 @@ import HorizontalScrollRow from './HorizontalScrollRow';
 import ProjectTypeCard from './ProjectTypeCard';
 import AddMoreCard from './AddMoreCard';
 import ProjectCard from './ProjectCard';
-import CreateProjectModal from './CreateProjectModal';
-
 export default function HomePage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showCreateModal, setShowCreateModal] = useState(false);
   const [confirmDeleteProject, setConfirmDeleteProject] = useState<string | null>(null);
   const router = useRouter();
   const thumbnailsGeneratedRef = useRef<Set<string>>(new Set());
@@ -137,10 +134,9 @@ export default function HomePage() {
     return projects.filter(p => p.projectType === type).length;
   };
 
-  // Get recent projects (sorted by modifiedAt, limited to 5)
+  // Get all projects sorted by modifiedAt (most recent first)
   const recentProjects = [...projects]
-    .sort((a, b) => new Date(b.modifiedAt).getTime() - new Date(a.modifiedAt).getTime())
-    .slice(0, 5);
+    .sort((a, b) => new Date(b.modifiedAt).getTime() - new Date(a.modifiedAt).getTime());
 
   const handleTypeClick = (type: ProjectType) => {
     router.push(`/type/${type}`);
@@ -148,12 +144,6 @@ export default function HomePage() {
 
   const handleProjectClick = (projectId: string) => {
     router.push(`/project/${projectId}`);
-  };
-
-  const handleProjectCreated = (project: Project) => {
-    setProjects(prev => [project, ...prev]);
-    setShowCreateModal(false);
-    router.push(`/capture/${project.id}`);
   };
 
   const handleDeleteProject = async (projectId: string) => {
@@ -172,7 +162,9 @@ export default function HomePage() {
       {/* Header */}
       <div className="max-w-2xl mx-auto px-4 pt-10 pb-6 text-center">
         <h1 className="text-3xl font-bold mb-1">ChoraGraph Capture</h1>
-        <p className="text-gray-400 text-sm">Capture. Document. Remember.</p>
+        <p className="text-gray-400 text-sm">
+          Capture, document, remember <span className="font-bold text-white">what</span> and <span className="font-bold text-white">where</span>.
+        </p>
       </div>
 
       {/* Work Types Row */}
@@ -202,7 +194,7 @@ export default function HomePage() {
       </HorizontalScrollRow>
 
       {/* Recent Projects Section */}
-      <div className="max-w-2xl mx-auto px-6 pb-32">
+      <div className="max-w-2xl mx-auto px-8 pb-32">
         <h2 className="text-lg font-semibold text-white mb-4">Recent Projects</h2>
 
         {loading ? (
@@ -216,7 +208,7 @@ export default function HomePage() {
             </p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-5">
             {recentProjects.map((project) => (
               <ProjectCard
                 key={project.id}
@@ -229,33 +221,23 @@ export default function HomePage() {
         )}
       </div>
 
-      {/* Floating New Project Button */}
-      <div className="fixed bottom-6 left-0 right-0 flex justify-center z-40 px-4">
+      {/* Floating Search Button */}
+      <div className="fixed bottom-6 right-6 z-40">
         <button
-          onClick={() => setShowCreateModal(true)}
-          className="group relative px-8 py-12 rounded-full font-semibold transition-all duration-300 ease-out active:scale-95 hover:scale-105"
+          onClick={() => router.push('/search')}
+          className="group relative w-14 h-14 rounded-full font-semibold transition-all duration-300 ease-out active:scale-95 hover:scale-105"
         >
-          <div className="absolute inset-0 rounded-full bg-emerald-500/20 blur-xl group-hover:bg-emerald-400/30 transition-all duration-300" />
+          <div className="absolute inset-0 rounded-full bg-blue-500/20 blur-xl group-hover:bg-blue-400/30 transition-all duration-300" />
           <div className="absolute inset-0 rounded-full backdrop-blur-xl bg-white/10 border border-white/20 shadow-lg shadow-black/20" />
           <div className="absolute inset-x-2 top-0.5 h-1/2 rounded-t-full bg-gradient-to-b from-white/25 to-transparent" />
-          <div className="absolute inset-0 rounded-full bg-gradient-to-b from-emerald-400/30 via-emerald-500/20 to-emerald-600/30" />
-          <div className="absolute inset-x-4 bottom-1 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
-          <span className="relative flex items-center gap-2 text-white drop-shadow-sm">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+          <div className="absolute inset-0 rounded-full bg-gradient-to-b from-blue-400/30 via-blue-500/20 to-blue-600/30" />
+          <span className="relative flex items-center justify-center text-white drop-shadow-sm">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
-            New Project
           </span>
         </button>
       </div>
-
-      {/* Create Project Modal */}
-      {showCreateModal && (
-        <CreateProjectModal
-          onClose={() => setShowCreateModal(false)}
-          onProjectCreated={handleProjectCreated}
-        />
-      )}
 
       {/* Delete Project Confirmation Dialog */}
       {confirmDeleteProject && (

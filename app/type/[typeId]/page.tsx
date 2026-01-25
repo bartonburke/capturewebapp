@@ -206,12 +206,12 @@ export default function TypeFilteredPage() {
       </div>
 
       {/* Description */}
-      <div className="max-w-2xl mx-auto px-4 py-3">
+      <div className="max-w-2xl mx-auto px-8 py-3">
         <p className="text-gray-400 text-sm">{typeConfig.description}</p>
       </div>
 
       {/* Projects List */}
-      <div className="max-w-2xl mx-auto px-4 pb-8">
+      <div className="max-w-2xl mx-auto px-8 pb-8">
         {loading ? (
           <div className="text-center text-gray-400 py-12">Loading projects...</div>
         ) : projects.length === 0 ? (
@@ -229,7 +229,7 @@ export default function TypeFilteredPage() {
             </button>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-5">
             {projects.map((project) => (
               <ProjectCard
                 key={project.id}
