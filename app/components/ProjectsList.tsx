@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Project } from '../lib/types';
 import { getAllProjects, deleteProject, getProjectPhotos, updateProject } from '../lib/db';
 import CreateProjectModal from './CreateProjectModal';
@@ -168,8 +169,21 @@ export default function ProjectsList() {
     <div className="fixed inset-0 bg-gradient-to-b from-gray-900 to-black text-white overflow-y-scroll" style={{ WebkitOverflowScrolling: 'touch' }}>
       {/* Header */}
       <div className="max-w-2xl mx-auto px-6 pt-6 pb-4">
-        <h1 className="text-3xl font-bold mb-1">ChoraGraph Capture</h1>
-        <p className="text-gray-400 text-sm">Environmental Field Evidence</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold mb-1">ChoraGraph Capture</h1>
+            <p className="text-gray-400 text-sm">Environmental Field Evidence</p>
+          </div>
+          <Link
+            href="/graph"
+            className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            Search
+          </Link>
+        </div>
       </div>
 
       {/* Projects List */}

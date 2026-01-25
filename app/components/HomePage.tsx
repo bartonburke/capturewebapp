@@ -224,13 +224,13 @@ export default function HomePage() {
       {/* Floating Search Button */}
       <div className="fixed bottom-6 right-6 z-40">
         <button
-          onClick={() => router.push('/search')}
+          onClick={() => router.push('/graph')}
           className="group relative w-14 h-14 rounded-full font-semibold transition-all duration-300 ease-out active:scale-95 hover:scale-105"
         >
-          <div className="absolute inset-0 rounded-full bg-blue-500/20 blur-xl group-hover:bg-blue-400/30 transition-all duration-300" />
+          <div className="absolute inset-0 rounded-full bg-purple-500/20 blur-xl group-hover:bg-purple-400/30 transition-all duration-300" />
           <div className="absolute inset-0 rounded-full backdrop-blur-xl bg-white/10 border border-white/20 shadow-lg shadow-black/20" />
           <div className="absolute inset-x-2 top-0.5 h-1/2 rounded-t-full bg-gradient-to-b from-white/25 to-transparent" />
-          <div className="absolute inset-0 rounded-full bg-gradient-to-b from-blue-400/30 via-blue-500/20 to-blue-600/30" />
+          <div className="absolute inset-0 rounded-full bg-gradient-to-b from-purple-400/30 via-purple-500/20 to-purple-600/30" />
           <span className="relative flex items-center justify-center text-white drop-shadow-sm">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />

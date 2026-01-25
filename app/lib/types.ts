@@ -204,7 +204,8 @@ export type ProcessingStep =
   | 'analyzing_photos'
   | 'correlating'
   | 'extracting_entities'
-  | 'saving';
+  | 'saving'
+  | 'syncing';  // Syncing to Neo4j graph
 
 export interface ProcessingProgress {
   step: ProcessingStep;

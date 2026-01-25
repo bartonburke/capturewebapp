@@ -282,7 +282,73 @@ export default function ProjectDetailsPage() {
       await saveProcessingResult(result);
       setProcessingResult(result);
 
-      setProcessingProgress({ step: 'saving', progress: 100, message: 'Processing complete!' });
+      // Step 4: Sync to Neo4j graph
+      setProcessingProgress({ step: 'syncing', progress: 97, message: 'Syncing to knowledge graph...' });
+      console.log('[ProcessSession] Syncing to Neo4j...');
+
+      try {
+        // Build Portable Evidence Package format for ingest
+        const indexJson = {
+          session_id: sessionId,
+          project_type: project.projectType,
+          project_name: project.name,
+          timestamp_start: photos[0]?.timestamp || new Date().toISOString(),
+          timestamp_end: photos[photos.length - 1]?.timestamp || new Date().toISOString(),
+          photos: photoAnalyses.map((analysis, i) => {
+            const photo = photos.find(p => p.id === analysis.photoId);
+            return {
+              filename: `photo-${String(i + 1).padStart(3, '0')}.jpg`,
+              timestamp: analysis.timestamp,
+              gps: analysis.gps ? {
+                latitude: analysis.gps.latitude,
+                longitude: analysis.gps.longitude,
+                accuracy: analysis.gps.accuracy || 0,
+                timestamp: analysis.gps.timestamp || Date.now(),
+              } : undefined,
+              entities: analysis.entities.map(e => e.type),
+              vision_analysis: {
+                description: analysis.vlmDescription,
+                concerns: analysis.entities.map(e => e.description),
+                rec_potential: (analysis.entities.some(e => e.severity === 'high') ? 'high' :
+                               analysis.entities.some(e => e.severity === 'medium') ? 'medium' :
+                               analysis.entities.some(e => e.severity === 'low') ? 'low' : 'none') as 'high' | 'medium' | 'low' | 'none',
+                confidence: 0.85,
+              },
+              tags: analysis.catalogTags,
+            };
+          }),
+          session_summary: {
+            total_photos: photos.length,
+            entities_extracted: photoAnalyses.reduce((acc, a) => {
+              a.entities.forEach(e => {
+                acc[e.type] = (acc[e.type] || 0) + 1;
+              });
+              return acc;
+            }, {} as Record<string, number>),
+          },
+          processing_stage: 'graph_ready',
+          version: '2.0',
+        };
+
+        const ingestResponse = await fetch('/api/graph/ingest', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ indexJson }),
+        });
+
+        const ingestResult = await ingestResponse.json();
+        if (ingestResult.success) {
+          console.log(`[ProcessSession] Neo4j sync complete: ${ingestResult.nodesCreated.photos} photos, ${ingestResult.nodesCreated.entities} entities`);
+        } else {
+          console.warn('[ProcessSession] Neo4j sync failed:', ingestResult.errors);
+          // Don't fail the whole process - sync is non-critical
+        }
+      } catch (syncError) {
+        console.warn('[ProcessSession] Neo4j sync error (non-critical):', syncError);
+        // Continue - sync failure shouldn't block processing completion
+      }
+
+      setProcessingProgress({ step: 'syncing', progress: 100, message: 'Processing complete!' });
       console.log('[ProcessSession] Complete!');
 
     } catch (error: any) {
@@ -537,6 +603,16 @@ export default function ProjectDetailsPage() {
               <p className="text-gray-400 text-sm">Lead: {project.lead}</p>
             </div>
             <div className="flex gap-2">
+              <button
+                onClick={() => router.push(`/graph?sessionId=${project.launchSessionId || project.id}`)}
+                className="p-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-xl transition-colors flex-shrink-0"
+                aria-label="Search in project"
+                title="Search in project"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </button>
               <button
                 onClick={() => setConfirmDeleteProject(true)}
                 className="p-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl transition-colors flex-shrink-0"
