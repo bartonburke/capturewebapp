@@ -86,15 +86,19 @@ ${entityDescriptions}
      ${transcriptContext ? `- "ActionItem" - Something the consultant wants to follow up on
      - "Question" - A question the consultant asked (include your answer)
      - "Observation" - Consultant's verbal observation worth noting` : ''}
-   - description: Detailed description with measurements/specifics when possible
+   - description: Brief description of what was found
    - severity: "high" | "medium" | "low" | "info"
    - recommendation: Follow-up action if applicable
+   - extractedData: **CRITICAL for "identifier" type - put EXACT OCR text here in format "Key: Value | Key2: Value2"**
+   - suggestedFollowUp: If label/text not fully captured, specify what photo angle is needed
 
    **Severity Guidelines:**
    - high: Critical finding requiring immediate attention or investigation
    - medium: Notable finding warranting follow-up
    - low: Minor observation for documentation
    - info: General feature documentation
+
+   **For inventory/asset projects:** When you see text on labels, put the EXACT characters in extractedData, NOT in description.
 
 ${gpsText}
 [Photo timestamp: ${timestamp}]
@@ -110,11 +114,11 @@ Respond ONLY with valid JSON in this exact structure:
       "type": "${entityTypes}"${transcriptContext ? ' | "ActionItem" | "Question" | "Observation"' : ''},
       "description": "string",
       "severity": "high" | "medium" | "low" | "info",
-      "recommendation": "string or null"${transcriptContext ? `,
+      "recommendation": "string or null",
+      "extractedData": "string or null (USE THIS for exact OCR text: 'Brand: X | Model: Y | Serial: Z')",
+      "suggestedFollowUp": "string or null (suggest retake if label not fully visible)"${transcriptContext ? `,
       "consultantContext": "string or null",
       "aiResponse": "string or null",
-      "extractedData": "string or null",
-      "suggestedFollowUp": "string or null",
       "priorityReason": "string or null"` : ''}
     }
   ]

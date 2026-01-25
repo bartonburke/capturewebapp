@@ -183,7 +183,7 @@ export default function PhotoDetailPage() {
         />
       </div>
 
-      {/* REC Potential Banner - Displayed prominently below photo */}
+      {/* Findings Summary Banner - Displayed prominently below photo */}
       {analysis && (
         <div className={`px-4 py-3 ${
           analysis.entities?.some(e => e.severity === 'high')
@@ -200,14 +200,14 @@ export default function PhotoDetailPage() {
                 <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
               <span className="font-semibold text-white">
-                REC Potential: {
+                {project?.projectType === 'phase1-esa' ? 'REC Potential' : 'Priority'}: {
                   analysis.entities?.some(e => e.severity === 'high')
                     ? 'High'
                     : analysis.entities?.some(e => e.severity === 'medium')
                     ? 'Medium'
                     : analysis.entities?.some(e => e.severity === 'low')
                     ? 'Low'
-                    : 'None Identified'
+                    : 'Info'
                 }
               </span>
             </div>
@@ -255,7 +255,7 @@ export default function PhotoDetailPage() {
         {analysis && analysis.entities && analysis.entities.length > 0 && (
           <div className="pb-4 border-b border-gray-700">
             <div className="text-xs font-semibold text-gray-400 uppercase mb-3">
-              Environmental Findings
+              {project?.projectType === 'phase1-esa' || project?.projectType === 'eir-eis' ? 'Environmental Findings' : 'Findings'}
             </div>
             <div className="space-y-3">
               {analysis.entities.map((entity, i) => (
@@ -332,6 +332,22 @@ export default function PhotoDetailPage() {
                     <div className="mt-2 p-2 bg-cyan-900/20 rounded">
                       <span className="text-xs text-cyan-400 font-medium">AI Response: </span>
                       <span className="text-sm text-cyan-200">{entity.aiResponse}</span>
+                    </div>
+                  )}
+
+                  {/* Show extracted data (OCR results, measurements, etc.) */}
+                  {entity.extractedData && (
+                    <div className="mt-2 p-2 bg-green-900/20 rounded border border-green-800/50">
+                      <span className="text-xs text-green-400 font-medium block mb-1">📋 Extracted Data:</span>
+                      <span className="text-sm text-green-200 font-mono">{entity.extractedData}</span>
+                    </div>
+                  )}
+
+                  {/* Show suggested follow-up if label wasn't fully captured */}
+                  {entity.suggestedFollowUp && (
+                    <div className="mt-2 p-2 bg-yellow-900/20 rounded border border-yellow-800/50">
+                      <span className="text-xs text-yellow-400 font-medium">📸 Follow-up needed: </span>
+                      <span className="text-sm text-yellow-200">{entity.suggestedFollowUp}</span>
                     </div>
                   )}
 
