@@ -587,6 +587,16 @@ export default function ProjectDetailsPage() {
             </div>
             <div className="flex gap-2">
               <button
+                onClick={() => router.push(`/graph?sessionId=${project.launchSessionId || project.id}`)}
+                className="p-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-xl transition-colors flex-shrink-0"
+                aria-label="Search in project"
+                title="Search in project"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </button>
+              <button
                 onClick={() => setConfirmDeleteProject(true)}
                 className="p-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl transition-colors flex-shrink-0"
                 aria-label="Delete project"

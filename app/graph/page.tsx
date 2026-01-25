@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
 interface SearchResult {
@@ -37,6 +38,9 @@ const EXAMPLE_QUERIES = [
 ];
 
 export default function GraphSearchPage() {
+  const searchParams = useSearchParams();
+  const sessionId = searchParams.get('sessionId');
+
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [response, setResponse] = useState<SearchResponse | null>(null);
@@ -53,7 +57,7 @@ export default function GraphSearchPage() {
       const res = await fetch('/api/graph/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: searchQuery }),
+        body: JSON.stringify({ query: searchQuery, sessionId: sessionId || undefined }),
       });
 
       const data: SearchResponse = await res.json();
@@ -110,15 +114,31 @@ export default function GraphSearchPage() {
         <div className="max-w-6xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-xl font-semibold text-gray-900">Graph Search</h1>
-              <p className="text-sm text-gray-500">Natural language search over photo graph</p>
+              <h1 className="text-xl font-semibold text-gray-900">
+                {sessionId ? 'Project Search' : 'Graph Search'}
+              </h1>
+              <p className="text-sm text-gray-500">
+                {sessionId
+                  ? `Searching within session ${sessionId.slice(0, 8)}...`
+                  : 'Natural language search over photo graph'}
+              </p>
             </div>
-            <Link
-              href="/"
-              className="text-sm text-blue-600 hover:text-blue-800"
-            >
-              Back to Projects
-            </Link>
+            <div className="flex items-center gap-3">
+              {sessionId && (
+                <Link
+                  href="/graph"
+                  className="text-sm text-purple-600 hover:text-purple-800"
+                >
+                  All Photos
+                </Link>
+              )}
+              <Link
+                href="/"
+                className="text-sm text-blue-600 hover:text-blue-800"
+              >
+                Back to Projects
+              </Link>
+            </div>
           </div>
         </div>
       </header>

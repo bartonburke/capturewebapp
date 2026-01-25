@@ -17,7 +17,23 @@ const openai = new OpenAI({
 });
 
 // System prompt for NL→Cypher translation
-const CYPHER_SYSTEM_PROMPT = `You are a Cypher query generator for a photo graph database.
+// Build system prompt with optional session filter context
+function buildSystemPrompt(sessionId?: string): string {
+  const sessionFilter = sessionId
+    ? `\n\nIMPORTANT: All queries MUST filter by sessionId = '${sessionId}'. Add this WHERE clause to every query.`
+    : '';
+
+  const sessionExamples = sessionId
+    ? `
+
+Q: "all photos" (with sessionId filter)
+A: MATCH (p:Photo) WHERE p.sessionId = '${sessionId}' RETURN p LIMIT 50
+
+Q: "photos with AOCs" (with sessionId filter)
+A: MATCH (p:Photo)-[:SHOWS]->(e:Entity) WHERE p.sessionId = '${sessionId}' AND e.entityType = 'AOC' RETURN p, e`
+    : '';
+
+  return `You are a Cypher query generator for a photo graph database.
 
 Schema:
 - (:Photo {id, timestamp, location: point, vlmDescription, catalogTags: [string], imageUrl, sessionId, recPotential, confidence})
@@ -35,6 +51,7 @@ Spatial functions:
 Text search:
 - Use CONTAINS for partial text matching (case-sensitive)
 - Use toLower() for case-insensitive: toLower(p.vlmDescription) CONTAINS toLower('search term')
+${sessionFilter}
 
 Given a natural language query, generate ONLY the Cypher query. No explanation, no markdown, no backticks.
 
@@ -63,8 +80,10 @@ A: MATCH (p:Photo)-[:SHOWS]->(e:Entity) WHERE e.entityType IN ['REC', 'AOC'] OR 
 
 Q: "photos showing drains or pipes"
 A: MATCH (p:Photo) WHERE toLower(p.vlmDescription) CONTAINS 'drain' OR toLower(p.vlmDescription) CONTAINS 'pipe' RETURN p
+${sessionExamples}
 
 Always include LIMIT 50 if no limit is specified to prevent large result sets.`;
+}
 
 interface SearchResult {
   photo: {
@@ -93,14 +112,14 @@ interface SearchResponse {
 /**
  * Generate Cypher query from natural language using OpenAI
  */
-async function generateCypherWithOpenAI(query: string): Promise<string> {
+async function generateCypherWithOpenAI(query: string, sessionId?: string): Promise<string> {
   const response = await openai.chat.completions.create({
     model: 'gpt-4o-mini',
     max_tokens: 500,
     messages: [
       {
         role: 'system',
-        content: CYPHER_SYSTEM_PROMPT,
+        content: buildSystemPrompt(sessionId),
       },
       {
         role: 'user',
@@ -128,7 +147,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<SearchRespons
 
   try {
     const body = await req.json();
-    const { query } = body;
+    const { query, sessionId } = body;
 
     if (!query || typeof query !== 'string') {
       return NextResponse.json(
@@ -143,10 +162,10 @@ export async function POST(req: NextRequest): Promise<NextResponse<SearchRespons
       );
     }
 
-    console.log(`[GraphSearch] Query: "${query}"`);
+    console.log(`[GraphSearch] Query: "${query}"${sessionId ? ` (sessionId: ${sessionId})` : ''}`);
 
-    // Step 1: Translate NL to Cypher using OpenAI
-    const cypherQuery = await generateCypherWithOpenAI(query);
+    // Step 1: Translate NL to Cypher using OpenAI (with optional session filter)
+    const cypherQuery = await generateCypherWithOpenAI(query, sessionId);
 
     console.log(`[GraphSearch] Generated Cypher: ${cypherQuery}`);
 
