@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
@@ -37,7 +37,7 @@ const EXAMPLE_QUERIES = [
   'photos showing pipes or drains',
 ];
 
-export default function GraphSearchPage() {
+function GraphSearchContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get('sessionId');
 
@@ -311,5 +311,17 @@ export default function GraphSearchPage() {
         )}
       </main>
     </div>
+  );
+}
+
+export default function GraphSearchPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-gray-500">Loading...</div>
+      </div>
+    }>
+      <GraphSearchContent />
+    </Suspense>
   );
 }
