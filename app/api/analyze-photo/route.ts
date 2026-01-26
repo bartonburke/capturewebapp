@@ -24,6 +24,37 @@ function buildAnalysisPrompt(
     ? `[GPS coordinates: ${gps.latitude.toFixed(6)}, ${gps.longitude.toFixed(6)} ±${Math.round(gps.accuracy)}m]`
     : '[GPS coordinates: Not available]';
 
+  // Home inventory uses a simplified, graph-ready output format
+  if (projectType === 'home-inventory') {
+    const transcriptNote = transcriptContext
+      ? `\n\n## VERBAL CONTEXT\nThe person said: "${transcriptContext.text}"\nIncorporate any mentioned items or location details into your response.`
+      : '';
+
+    return `${basePrompt}${transcriptNote}
+
+${gpsText}
+[Photo timestamp: ${timestamp}]
+
+Respond ONLY with valid JSON in this exact structure:
+{
+  "description": "Brief findable description of what's in this photo",
+  "room": "lowercase room name (kitchen, bedroom, garage, etc.)",
+  "area": "where in the room (counter, closet, back wall, etc.) or null",
+  "container": "what holds the items (drawer, shelf, bin, etc.) or null",
+  "items": [
+    {"name": "item name", "attributes": {"color": "red", "quantity": "3"}}
+  ],
+  "catalogTags": ["room_tag", "category_tag", "descriptor_tag"],
+  "notes": ["any verbal context worth remembering"]
+}
+
+IMPORTANT:
+- room is REQUIRED, always lowercase
+- items array should list every distinct item visible
+- attributes are optional, only include if helpful for finding
+- notes should capture transcript context, ownership info, or tips for finding`;
+  }
+
   // Build transcript context section
   let transcriptSection = '';
   if (transcriptContext) {
@@ -431,11 +462,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Parse JSON response
-    let parsedResponse: {
-      description: string;
-      catalogTags: string[];
-      entities: PhotoEntity[];
-    };
+    let parsedResponse: Record<string, unknown>;
 
     try {
       // Try to extract JSON from markdown code blocks if present
@@ -449,24 +476,103 @@ export async function POST(req: NextRequest) {
       throw new Error(`${provider} returned invalid JSON format`);
     }
 
-    // Validate response structure
-    if (!parsedResponse.description || !Array.isArray(parsedResponse.catalogTags) || !Array.isArray(parsedResponse.entities)) {
-      throw new Error(`${provider} response missing required fields`);
+    // Handle home-inventory format (graph-ready structure)
+    let analysis: PhotoAnalysis;
+
+    if (projectType === 'home-inventory') {
+      // Validate home-inventory response structure
+      if (!parsedResponse.description || !parsedResponse.room) {
+        throw new Error(`${provider} response missing required fields (description, room)`);
+      }
+
+      // Convert items array to entities for compatibility
+      const items = (parsedResponse.items as Array<{name: string; attributes?: Record<string, string>}>) || [];
+      const entities: PhotoEntity[] = [];
+
+      // Add location entity
+      const locationParts = [parsedResponse.room as string];
+      if (parsedResponse.area) locationParts.push(parsedResponse.area as string);
+      if (parsedResponse.container) locationParts.push(parsedResponse.container as string);
+
+      entities.push({
+        type: 'location',
+        description: locationParts.join(' > '),
+        severity: 'info',
+      });
+
+      // Add container entity if present
+      if (parsedResponse.container) {
+        entities.push({
+          type: 'container',
+          description: parsedResponse.container as string,
+          severity: 'info',
+        });
+      }
+
+      // Add item entities
+      for (const item of items) {
+        const attrStr = item.attributes
+          ? Object.entries(item.attributes).map(([k, v]) => `${k}: ${v}`).join(', ')
+          : '';
+        entities.push({
+          type: 'item',
+          description: item.name,
+          severity: 'info',
+          extractedData: attrStr || undefined,
+        });
+      }
+
+      // Add notes as note entities
+      const notes = (parsedResponse.notes as string[]) || [];
+      for (const note of notes) {
+        entities.push({
+          type: 'note',
+          description: note,
+          severity: 'info',
+        });
+      }
+
+      analysis = {
+        photoId,
+        vlmDescription: parsedResponse.description as string,
+        catalogTags: (parsedResponse.catalogTags as string[]) || [],
+        entities,
+        timestamp,
+        gps: gps || null,
+        transcriptSegment: transcriptSegment || null,
+        // Store the graph-ready fields for later ingestion
+        room: parsedResponse.room as string,
+        area: (parsedResponse.area as string) || null,
+        container: (parsedResponse.container as string) || null,
+        items: items,
+      };
+
+      console.log(`[AnalyzePhoto] Success (home-inventory) - Room: ${analysis.room}, Items: ${items.length}, Entities: ${entities.length}`);
+    } else {
+      // Standard format for other project types
+      const standardResponse = parsedResponse as {
+        description: string;
+        catalogTags: string[];
+        entities: PhotoEntity[];
+      };
+
+      // Validate response structure
+      if (!standardResponse.description || !Array.isArray(standardResponse.catalogTags) || !Array.isArray(standardResponse.entities)) {
+        throw new Error(`${provider} response missing required fields`);
+      }
+
+      analysis = {
+        photoId,
+        vlmDescription: standardResponse.description,
+        catalogTags: standardResponse.catalogTags,
+        entities: standardResponse.entities,
+        timestamp,
+        gps: gps || null,
+        transcriptSegment: transcriptSegment || null
+      };
+
+      console.log(`[AnalyzePhoto] Success - Generated ${analysis.catalogTags.length} tags and ${analysis.entities.length} entities`);
     }
-
-    // Construct PhotoAnalysis object
-    const analysis: PhotoAnalysis = {
-      photoId,
-      vlmDescription: parsedResponse.description,
-      catalogTags: parsedResponse.catalogTags,
-      entities: parsedResponse.entities,
-      timestamp,
-      gps: gps || null,
-      // Store the transcript segment that was used for context
-      transcriptSegment: transcriptSegment || null
-    };
-
-    console.log(`[AnalyzePhoto] Success - Generated ${analysis.catalogTags.length} tags and ${analysis.entities.length} entities`);
 
     // Log if we found action items or questions
     const actionItems = analysis.entities.filter(e => e.type === 'ActionItem');

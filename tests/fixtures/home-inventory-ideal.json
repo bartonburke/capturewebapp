@@ -1,0 +1,211 @@
+{
+  "description": "Ideal home inventory photo analyses for testing graph ingestion",
+  "session_id": "test-home-inventory-001",
+  "project_type": "home-inventory",
+  "photos": [
+    {
+      "photoId": "photo-001",
+      "timestamp": "2026-01-26T10:00:00Z",
+      "gps": { "latitude": 33.7250, "longitude": -118.3050, "accuracy": 5 },
+      "vlmDescription": "Tool drawer in kitchen with assorted hand tools",
+      "room": "kitchen",
+      "area": "left of stove",
+      "container": "tool drawer",
+      "items": [
+        { "name": "hammer", "attributes": {} },
+        { "name": "Phillips screwdriver set", "attributes": { "quantity": "6-piece" } },
+        { "name": "tape measure", "attributes": { "color": "yellow" } },
+        { "name": "adjustable wrench", "attributes": {} },
+        { "name": "utility knife", "attributes": {} },
+        { "name": "Allen key set", "attributes": {} }
+      ],
+      "catalogTags": ["kitchen", "tools", "drawer", "frequently_used"],
+      "notes": ["main tools for quick repairs"]
+    },
+    {
+      "photoId": "photo-002",
+      "timestamp": "2026-01-26T10:02:00Z",
+      "gps": { "latitude": 33.7250, "longitude": -118.3050, "accuracy": 5 },
+      "vlmDescription": "Kitchen counter with stand mixer and toaster",
+      "room": "kitchen",
+      "area": "counter, left of stove",
+      "container": null,
+      "items": [
+        { "name": "stand mixer", "attributes": { "color": "red", "brand": "KitchenAid" } },
+        { "name": "toaster", "attributes": { "slots": "4" } },
+        { "name": "knife block", "attributes": { "knives": "8" } }
+      ],
+      "catalogTags": ["kitchen", "appliance", "counter", "everyday"],
+      "notes": []
+    },
+    {
+      "photoId": "photo-003",
+      "timestamp": "2026-01-26T10:05:00Z",
+      "gps": { "latitude": 33.7251, "longitude": -118.3051, "accuracy": 5 },
+      "vlmDescription": "Garage shelving with holiday decorations in bins",
+      "room": "garage",
+      "area": "metal shelving unit, back wall",
+      "container": "large clear plastic bin, top shelf",
+      "items": [
+        { "name": "christmas lights", "attributes": { "quantity": "3 strands" } },
+        { "name": "ornaments", "attributes": {} },
+        { "name": "tree stand", "attributes": {} },
+        { "name": "wreath", "attributes": { "color": "green" } }
+      ],
+      "catalogTags": ["garage", "shelf", "bin", "seasonal", "holiday", "christmas"],
+      "notes": ["holiday decorations, used annually in December"]
+    },
+    {
+      "photoId": "photo-004",
+      "timestamp": "2026-01-26T10:08:00Z",
+      "gps": { "latitude": 33.7251, "longitude": -118.3051, "accuracy": 5 },
+      "vlmDescription": "Garage workbench with power tools",
+      "room": "garage",
+      "area": "workbench, right side",
+      "container": null,
+      "items": [
+        { "name": "cordless drill", "attributes": { "brand": "DeWalt", "color": "yellow" } },
+        { "name": "circular saw", "attributes": { "brand": "DeWalt" } },
+        { "name": "hammer", "attributes": { "type": "framing" } }
+      ],
+      "catalogTags": ["garage", "tools", "power_tool", "workbench"],
+      "notes": ["main power tools - DeWalt set"]
+    },
+    {
+      "photoId": "photo-005",
+      "timestamp": "2026-01-26T10:12:00Z",
+      "gps": { "latitude": 33.7250, "longitude": -118.3052, "accuracy": 5 },
+      "vlmDescription": "Master bedroom closet with winter clothes on top shelf",
+      "room": "bedroom",
+      "area": "closet",
+      "container": "top shelf",
+      "items": [
+        { "name": "winter blankets", "attributes": { "quantity": "2" } },
+        { "name": "luggage set", "attributes": { "pieces": "3" } },
+        { "name": "hat box", "attributes": {} }
+      ],
+      "catalogTags": ["bedroom", "closet", "shelf", "seasonal", "linens"],
+      "notes": ["seasonal storage - winter items"]
+    },
+    {
+      "photoId": "photo-006",
+      "timestamp": "2026-01-26T10:15:00Z",
+      "gps": { "latitude": 33.7250, "longitude": -118.3052, "accuracy": 5 },
+      "vlmDescription": "Bedroom nightstand with lamp and humidifier",
+      "room": "bedroom",
+      "area": "nightstand, right side of bed",
+      "container": null,
+      "items": [
+        { "name": "table lamp", "attributes": {} },
+        { "name": "humidifier", "attributes": { "type": "cool mist" } },
+        { "name": "alarm clock", "attributes": {} },
+        { "name": "phone charger", "attributes": {} }
+      ],
+      "catalogTags": ["bedroom", "nightstand", "electronics", "everyday"],
+      "notes": []
+    },
+    {
+      "photoId": "photo-007",
+      "timestamp": "2026-01-26T10:18:00Z",
+      "gps": { "latitude": 33.7249, "longitude": -118.3050, "accuracy": 5 },
+      "vlmDescription": "Bathroom cabinet under sink with cleaning supplies",
+      "room": "bathroom",
+      "area": "under sink",
+      "container": "cabinet",
+      "items": [
+        { "name": "cleaning supplies", "attributes": {} },
+        { "name": "extra toilet paper", "attributes": { "quantity": "4 rolls" } },
+        { "name": "plunger", "attributes": {} },
+        { "name": "first aid kit", "attributes": {} }
+      ],
+      "catalogTags": ["bathroom", "cabinet", "under_sink", "cleaning", "first_aid"],
+      "notes": ["first aid kit is here - important to know"]
+    },
+    {
+      "photoId": "photo-008",
+      "timestamp": "2026-01-26T10:22:00Z",
+      "gps": { "latitude": 33.7250, "longitude": -118.3049, "accuracy": 5 },
+      "vlmDescription": "Home office desk with computer and accessories",
+      "room": "office",
+      "area": "desk",
+      "container": null,
+      "items": [
+        { "name": "laptop", "attributes": { "brand": "MacBook Pro" } },
+        { "name": "external monitor", "attributes": { "size": "27 inch" } },
+        { "name": "keyboard", "attributes": { "type": "mechanical" } },
+        { "name": "mouse", "attributes": {} },
+        { "name": "desk lamp", "attributes": {} }
+      ],
+      "catalogTags": ["office", "desk", "electronics", "computer", "everyday"],
+      "notes": ["main work setup"]
+    },
+    {
+      "photoId": "photo-009",
+      "timestamp": "2026-01-26T10:25:00Z",
+      "gps": { "latitude": 33.7250, "longitude": -118.3049, "accuracy": 5 },
+      "vlmDescription": "Office closet with office supplies in bins",
+      "room": "office",
+      "area": "closet",
+      "container": "plastic organizer bins",
+      "items": [
+        { "name": "printer paper", "attributes": { "quantity": "2 reams" } },
+        { "name": "stapler", "attributes": {} },
+        { "name": "tape dispenser", "attributes": {} },
+        { "name": "scissors", "attributes": {} },
+        { "name": "spare chargers", "attributes": { "quantity": "3" } }
+      ],
+      "catalogTags": ["office", "closet", "bin", "office_supplies", "bulk"],
+      "notes": ["spare chargers are in the green bin"]
+    },
+    {
+      "photoId": "photo-010",
+      "timestamp": "2026-01-26T10:28:00Z",
+      "gps": { "latitude": 33.7251, "longitude": -118.3050, "accuracy": 5 },
+      "vlmDescription": "Living room entertainment center with TV and gaming console",
+      "room": "living room",
+      "area": "entertainment center",
+      "container": null,
+      "items": [
+        { "name": "TV", "attributes": { "size": "55 inch", "brand": "Samsung" } },
+        { "name": "soundbar", "attributes": {} },
+        { "name": "gaming console", "attributes": { "type": "PlayStation 5" } },
+        { "name": "streaming device", "attributes": { "type": "Apple TV" } }
+      ],
+      "catalogTags": ["living_room", "electronics", "tv", "gaming", "entertainment"],
+      "notes": []
+    }
+  ],
+  "expected_graph": {
+    "locations": [
+      { "name": "kitchen", "level": "room" },
+      { "name": "tool drawer", "level": "container", "parent": "kitchen" },
+      { "name": "garage", "level": "room" },
+      { "name": "large clear plastic bin, top shelf", "level": "container", "parent": "garage" },
+      { "name": "bedroom", "level": "room" },
+      { "name": "top shelf", "level": "container", "parent": "bedroom" },
+      { "name": "bathroom", "level": "room" },
+      { "name": "cabinet", "level": "container", "parent": "bathroom" },
+      { "name": "office", "level": "room" },
+      { "name": "plastic organizer bins", "level": "container", "parent": "office" },
+      { "name": "living room", "level": "room" }
+    ],
+    "items_count": 42,
+    "duplicate_items": [
+      { "name": "hammer", "photos": ["photo-001", "photo-004"], "note": "Same item type in 2 locations - should remain 2 entities (exact match)" }
+    ],
+    "queries_to_validate": [
+      {
+        "question": "Where's the hammer?",
+        "expected": ["kitchen > tool drawer", "garage > workbench"]
+      },
+      {
+        "question": "What's in the garage?",
+        "expected_items": ["christmas lights", "ornaments", "tree stand", "wreath", "cordless drill", "circular saw", "hammer"]
+      },
+      {
+        "question": "Where are the spare chargers?",
+        "expected": "office > closet > plastic organizer bins"
+      }
+    ]
+  }
+}

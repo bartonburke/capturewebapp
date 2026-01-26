@@ -140,6 +140,15 @@ export interface PhotoAnalysis {
   transcriptSegment: TranscriptSegment | null;  // Matched transcript segment
   timestamp: string;          // When photo was taken (ISO8601)
   gps: GpsCoordinates | null; // GPS at photo time
+
+  // Home inventory specific fields (graph-ready format)
+  room?: string;              // Which room (lowercase)
+  area?: string | null;       // Where in the room
+  container?: string | null;  // What holds the items
+  items?: Array<{             // List of items visible
+    name: string;
+    attributes?: Record<string, string>;
+  }>;
 }
 
 // Photo-specific entity (simpler than ExtractedEntity for Phase 4)
@@ -147,7 +156,7 @@ export interface PhotoAnalysis {
 export interface PhotoEntity {
   type: string;  // Dynamic based on project entitySchema + transcript-derived types
   // Common types: 'REC' | 'AOC' | 'Feature' | 'Equipment' | 'Condition'
-  // Home inventory: 'item' | 'identifier' | 'manufacturer' | 'specs' | 'date_info' | 'condition' | 'location' | 'compliance' | 'follow_up'
+  // Home inventory: 'item' | 'location' | 'container' | 'note'
   // Transcript-derived: 'ActionItem' | 'Question' | 'Observation'
   description: string;
   severity: 'high' | 'medium' | 'low' | 'info';
