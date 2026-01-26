@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Project, PhotoMetadata, AudioMetadata, ProcessingResult, Transcript, TranscriptSegment, PhotoAnalysis, ProcessingProgress, SessionSynthesis } from '../../lib/types';
 import { getProject, getProjectPhotos, getProjectAudio, deletePhoto, deleteAudio, updateProject, deleteProject, deleteLaunchSession, saveProcessingResult, getSessionProcessingResult, savePhoto } from '../../lib/db';
-import { downloadBlob, exportPortableEvidencePackage, generatePortableFilename } from '../../lib/export';
+import { downloadBlob, exportPortableEvidencePackage, generatePortableFilename, exportProcessedSession, generateProcessedFilename } from '../../lib/export';
 import { findMatchingSegment } from '../../lib/correlation';
 import { extractExifData, fileToBase64 } from '../../lib/exif';
 
@@ -788,12 +788,51 @@ export default function ProjectDetailsPage() {
         {/* Synthesis Deliverables Section - Home Inventory */}
         {processingResult?.synthesis && processingResult.synthesis.deliverables.length > 0 && (
           <section className="mb-8">
-            <h2 className="text-white font-semibold text-lg mb-4 flex items-center gap-2">
-              <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-              </svg>
-              Inventory Summary
-            </h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-white font-semibold text-lg flex items-center gap-2">
+                <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                </svg>
+                Inventory Summary
+              </h2>
+              <button
+                onClick={async () => {
+                  if (!project || !processingResult) return;
+                  setIsExporting(true);
+                  try {
+                    const zipBlob = await exportProcessedSession(project, photos, audio, processingResult);
+                    const filename = generateProcessedFilename(project.name, project.projectType || 'home-inventory');
+                    downloadBlob(zipBlob, filename);
+                    setExportedFilename(filename);
+                    setShowExportDeleteConfirm(true);
+                  } catch (error) {
+                    console.error('Export failed:', error);
+                    alert('Export failed. Please try again.');
+                  } finally {
+                    setIsExporting(false);
+                  }
+                }}
+                disabled={isExporting}
+                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-800 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5"
+              >
+                {isExporting ? (
+                  <>
+                    <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Exporting...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Export
+                  </>
+                )}
+              </button>
+            </div>
             <div className="space-y-4">
               {processingResult.synthesis.deliverables.map((deliverable) => (
                 <details

@@ -1,7 +1,7 @@
 // Export utilities for ChoraGraph Capture PWA
 
 import JSZip from 'jszip';
-import { Project, PhotoMetadata, AudioMetadata, GpsCoordinates, CompassData, ProjectType, ProcessingStage } from './types';
+import { Project, PhotoMetadata, AudioMetadata, GpsCoordinates, CompassData, ProjectType, ProcessingStage, ProcessingResult, SessionSynthesis } from './types';
 
 interface ExportData {
   project: Omit<Project, 'photoCount' | 'audioCount'>;
@@ -228,9 +228,33 @@ interface PortableEvidenceIndex {
     entities_extracted: Record<string, number>;
     key_observations: string[];
   };
+  // Synthesis results (Phase 5)
+  synthesis?: {
+    entity_clusters: Array<{
+      name: string;
+      type: string;
+      photo_ids: string[];
+      description: string;
+      confidence: number;
+    }>;
+    location_hierarchy: Array<{
+      id: string;
+      name: string;
+      level: string;
+      parent_id?: string;
+      photo_ids: string[];
+      item_count: number;
+    }>;
+    coverage: {
+      completeness_score: number;
+      photographed_locations: string[];
+      missing_locations: string[];
+      suggested_followups: string[];
+    };
+  };
   processing_stage: ProcessingStage;
   graph_ready: boolean;
-  version: '2.0' | '2.1';  // 2.1 = raw capture (no AI processing)
+  version: '2.0' | '2.1' | '3.0';  // 2.1 = raw capture, 3.0 = with synthesis
 }
 
 /**
@@ -401,4 +425,297 @@ export function generatePortableFilename(projectName: string): string {
   const date = new Date().toISOString().split('T')[0];
   const shortId = crypto.randomUUID().slice(0, 8);
   return `site-visit-${date}-${sanitized}-${shortId}.zip`;
+}
+
+/**
+ * Export project as a Portable Evidence Package with full AI processing results (v3.0)
+ *
+ * Includes all processing results: transcript, photo analyses, entities, and synthesis.
+ *
+ * Structure:
+ *   inventory-YYYY-MM-DD-uuid/
+ *   ├── index.json              (full metadata with synthesis)
+ *   ├── session-audio.webm      (raw audio recording)
+ *   ├── thumbnail.jpg           (project thumbnail)
+ *   ├── transcript.txt          (plain text transcript)
+ *   ├── SESSION_SUMMARY.md      (human-readable summary)
+ *   ├── deliverables/           (synthesis deliverables)
+ *   │   ├── room-inventory.md
+ *   │   ├── item-index.md
+ *   │   └── ...
+ *   └── photos/
+ *       ├── 001-site-photo.jpg
+ *       └── ...
+ */
+export async function exportProcessedSession(
+  project: Project,
+  photos: PhotoMetadata[],
+  audio: AudioMetadata[],
+  processingResult: ProcessingResult
+): Promise<Blob> {
+  const zip = new JSZip();
+
+  // Create folders
+  const photosFolder = zip.folder('photos');
+  const deliverablesFolder = zip.folder('deliverables');
+  if (!photosFolder || !deliverablesFolder) {
+    throw new Error('Failed to create zip folders');
+  }
+
+  const photoEntries: PortablePhotoEntry[] = [];
+
+  // Process photos with AI analysis data
+  for (let i = 0; i < photos.length; i++) {
+    const photo = photos[i];
+    const photoNumber = String(i + 1).padStart(3, '0');
+
+    // Find matching analysis for this photo
+    const analysis = processingResult.photoAnalyses.find(a => a.photoId === photo.id);
+
+    // Generate descriptive filename from analysis if available
+    let filename: string;
+    if (analysis?.vlmDescription) {
+      const shortDesc = analysis.vlmDescription.slice(0, 30).replace(/[^a-z0-9]/gi, '-').toLowerCase();
+      filename = `${photoNumber}-${shortDesc}.jpg`;
+    } else {
+      filename = `${photoNumber}-site-photo.jpg`;
+    }
+
+    // Add photo to zip
+    const photoBlob = dataURLtoBlob(photo.imageData);
+    photosFolder.file(filename, photoBlob);
+
+    // Build photo entry with analysis data
+    const entry: PortablePhotoEntry = {
+      filename,
+      timestamp: photo.timestamp,
+      session_seconds: photo.sessionTimestamp,
+      tags: analysis?.catalogTags || [],
+    };
+
+    if (photo.gps) {
+      entry.gps = photo.gps;
+    }
+
+    if (photo.compass) {
+      entry.compass = photo.compass;
+    }
+
+    if (analysis) {
+      entry.vision_analysis = {
+        description: analysis.vlmDescription,
+        concerns: analysis.entities
+          .filter(e => e.severity === 'high' || e.severity === 'medium')
+          .map(e => e.description),
+        rec_potential: 'none',  // Default for home inventory
+        confidence: 0.9,
+      };
+      entry.entities = analysis.entities.map(e => e.description);
+    }
+
+    photoEntries.push(entry);
+  }
+
+  // Generate thumbnail
+  if (photos.length > 0) {
+    const thumbnail = await generateThumbnail(photos[0].imageData, 200, 200);
+    if (thumbnail) {
+      const thumbnailBlob = dataURLtoBlob(thumbnail);
+      zip.file('thumbnail.jpg', thumbnailBlob);
+    }
+  }
+
+  // Export audio
+  if (audio.length > 0) {
+    const primaryAudio = audio[0];
+    const audioBlob = dataURLtoBlob(primaryAudio.audioData);
+    const ext = getExtensionFromMimeType(primaryAudio.mimeType);
+    zip.file(`session-audio.${ext}`, audioBlob);
+  }
+
+  // Add plain text transcript
+  if (processingResult.transcript?.fullText) {
+    zip.file('transcript.txt', processingResult.transcript.fullText);
+  }
+
+  // Add synthesis deliverables as separate files
+  if (processingResult.synthesis?.deliverables) {
+    for (const deliverable of processingResult.synthesis.deliverables) {
+      const ext = deliverable.format === 'json' ? 'json' : 'md';
+      const filename = `${deliverable.type}.${ext}`;
+      zip.file(`deliverables/${filename}`, deliverable.content);
+    }
+  }
+
+  // Generate SESSION_SUMMARY.md
+  const sessionSummary = generateSessionSummaryMd(project, photos, audio, processingResult);
+  zip.file('SESSION_SUMMARY.md', sessionSummary);
+
+  // Build synthesis data for index.json
+  const synthesisData = processingResult.synthesis ? {
+    entity_clusters: processingResult.synthesis.entityClusters.map(c => ({
+      name: c.canonicalName,
+      type: c.entityType,
+      photo_ids: c.photoIds,
+      description: c.mergedDescription,
+      confidence: c.confidence,
+    })),
+    location_hierarchy: processingResult.synthesis.locationHierarchy.map(l => ({
+      id: l.id,
+      name: l.name,
+      level: l.level,
+      parent_id: l.parentId,
+      photo_ids: l.photoIds,
+      item_count: l.itemCount,
+    })),
+    coverage: {
+      completeness_score: processingResult.synthesis.coverageAnalysis.completenessScore,
+      photographed_locations: processingResult.synthesis.coverageAnalysis.photographedLocations,
+      missing_locations: processingResult.synthesis.coverageAnalysis.missingLocations,
+      suggested_followups: processingResult.synthesis.coverageAnalysis.suggestedFollowups,
+    },
+  } : undefined;
+
+  // Count entities by type
+  const entitiesByType: Record<string, number> = {};
+  for (const analysis of processingResult.photoAnalyses) {
+    for (const entity of analysis.entities) {
+      const type = entity.type || 'unknown';
+      entitiesByType[type] = (entitiesByType[type] || 0) + 1;
+    }
+  }
+
+  // Build index.json
+  const index: PortableEvidenceIndex = {
+    session_id: project.launchSessionId || project.id,
+    project_id: project.externalProjectId,
+    project_type: project.projectType || 'home-inventory',
+    project_name: project.name,
+    timestamp_start: project.createdAt,
+    timestamp_end: project.modifiedAt,
+    location_start: photos[0]?.gps || undefined,
+    photos: photoEntries,
+    transcript: processingResult.transcript ? {
+      full_text: processingResult.transcript.fullText,
+      language: processingResult.transcript.language,
+      duration_seconds: processingResult.transcript.duration,
+      segments: processingResult.transcript.segments,
+    } : undefined,
+    session_summary: {
+      total_photos: photos.length,
+      total_duration_seconds: audio[0]?.duration || 0,
+      entities_extracted: entitiesByType,
+      key_observations: processingResult.photoAnalyses
+        .slice(0, 5)
+        .map(a => a.vlmDescription)
+        .filter(Boolean),
+    },
+    synthesis: synthesisData,
+    processing_stage: 'graph_ready',
+    graph_ready: true,
+    version: '3.0',
+  };
+
+  zip.file('index.json', JSON.stringify(index, null, 2));
+
+  // Generate zip
+  return await zip.generateAsync({
+    type: 'blob',
+    compression: 'DEFLATE',
+    compressionOptions: { level: 6 },
+  });
+}
+
+/**
+ * Generate human-readable SESSION_SUMMARY.md
+ */
+function generateSessionSummaryMd(
+  project: Project,
+  photos: PhotoMetadata[],
+  audio: AudioMetadata[],
+  processingResult: ProcessingResult
+): string {
+  const lines: string[] = [];
+
+  lines.push(`# ${project.name}`);
+  lines.push('');
+  lines.push(`**Project Type:** ${project.projectType || 'generic'}`);
+  lines.push(`**Captured:** ${new Date(project.createdAt).toLocaleString()}`);
+  lines.push(`**Photos:** ${photos.length}`);
+  lines.push(`**Audio Duration:** ${Math.round((audio[0]?.duration || 0) / 60)} minutes`);
+  lines.push('');
+
+  // Location info
+  if (photos[0]?.gps) {
+    const gps = photos[0].gps;
+    lines.push(`**Location:** ${gps.latitude.toFixed(5)}, ${gps.longitude.toFixed(5)}`);
+    lines.push('');
+  }
+
+  // Synthesis summary
+  if (processingResult.synthesis) {
+    const synthesis = processingResult.synthesis;
+
+    lines.push('## Summary');
+    lines.push('');
+    lines.push(`- **Completeness:** ${Math.round(synthesis.coverageAnalysis.completenessScore * 100)}%`);
+    lines.push(`- **Items Identified:** ${synthesis.entityClusters.filter(c => c.entityType === 'item').length}`);
+    lines.push(`- **Locations Found:** ${synthesis.locationHierarchy.filter(l => l.level === 'room').length} rooms`);
+    lines.push('');
+
+    // Missing locations
+    if (synthesis.coverageAnalysis.missingLocations.length > 0) {
+      lines.push('### Areas to Document');
+      for (const loc of synthesis.coverageAnalysis.missingLocations) {
+        lines.push(`- ${loc}`);
+      }
+      lines.push('');
+    }
+
+    // Deliverables list
+    if (synthesis.deliverables.length > 0) {
+      lines.push('## Deliverables');
+      lines.push('');
+      for (const d of synthesis.deliverables) {
+        lines.push(`- **${d.title}** - \`deliverables/${d.type}.md\``);
+      }
+      lines.push('');
+    }
+  }
+
+  // Transcript excerpt
+  if (processingResult.transcript?.fullText) {
+    lines.push('## Transcript Excerpt');
+    lines.push('');
+    lines.push('```');
+    lines.push(processingResult.transcript.fullText.slice(0, 500) + '...');
+    lines.push('```');
+    lines.push('');
+  }
+
+  // Photo observations
+  if (processingResult.photoAnalyses.length > 0) {
+    lines.push('## Photo Observations');
+    lines.push('');
+    for (const analysis of processingResult.photoAnalyses.slice(0, 10)) {
+      lines.push(`- ${analysis.vlmDescription}`);
+    }
+    if (processingResult.photoAnalyses.length > 10) {
+      lines.push(`- ... and ${processingResult.photoAnalyses.length - 10} more photos`);
+    }
+    lines.push('');
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Generate filename for processed session export
+ */
+export function generateProcessedFilename(projectName: string, projectType: ProjectType): string {
+  const sanitized = sanitizeFilename(projectName);
+  const date = new Date().toISOString().split('T')[0];
+  const shortId = crypto.randomUUID().slice(0, 8);
+  const prefix = projectType === 'home-inventory' ? 'inventory' : 'session';
+  return `${prefix}-${date}-${sanitized}-${shortId}.zip`;
 }
