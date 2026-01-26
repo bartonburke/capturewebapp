@@ -238,15 +238,33 @@ export async function getSessionProcessingResult(sessionId: string): Promise<Pro
   const index = tx.objectStore('processing_results').index('sessionId');
 
   return new Promise((resolve, reject) => {
-    const request = index.get(sessionId);
+    // Use getAll to handle duplicate records with same sessionId
+    // Then return the most recent one (by createdAt)
+    const request = index.getAll(sessionId);
     request.onsuccess = () => {
-      const result = request.result || null;
-      console.log('[DB] getSessionProcessingResult:', sessionId, result ? {
-        id: result.id,
-        status: result.status,
-        hasSynthesis: !!result.synthesis,
-      } : 'not found');
-      resolve(result);
+      const results = request.result || [];
+      console.log('[DB] getSessionProcessingResult:', sessionId, `found ${results.length} records`);
+
+      if (results.length === 0) {
+        resolve(null);
+        return;
+      }
+
+      // Sort by createdAt descending, return most recent
+      const sorted = results.sort((a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      const latest = sorted[0];
+
+      console.log('[DB] getSessionProcessingResult returning:', {
+        id: latest.id,
+        status: latest.status,
+        hasSynthesis: !!latest.synthesis,
+        createdAt: latest.createdAt,
+        totalRecords: results.length,
+      });
+
+      resolve(latest);
     };
     request.onerror = () => {
       console.error('[DB] getSessionProcessingResult error:', request.error);
