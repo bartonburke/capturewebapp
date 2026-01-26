@@ -198,70 +198,35 @@ const genericEntities: EntitySchemaItem[] = [
   },
 ];
 
-// Home Inventory entity schema (v2 - OCR-optimized)
+// Home Inventory entity schema (v3 - "Where's my stuff?" focused)
 const homeInventoryEntities: EntitySchemaItem[] = [
   {
     name: 'item',
-    displayName: 'Inventory Item',
-    description: 'Primary item being documented',
-    extractionKeywords: ['item', 'appliance', 'furniture', 'electronics', 'device', 'equipment'],
-    confidenceThreshold: 0.7,
-  },
-  {
-    name: 'identifier',
-    displayName: 'Product Identifier',
-    description: 'Serial number, model number, UPC, SKU - EXACT characters only',
-    extractionKeywords: ['serial', 'S/N', 'model', 'M/N', 'part', 'P/N', 'UPC', 'SKU', 'barcode', 'QR'],
-    confidenceThreshold: 0.9,  // High threshold - only report what you can clearly read
-  },
-  {
-    name: 'manufacturer',
-    displayName: 'Manufacturer Info',
-    description: 'Brand, make, manufacturer name and country of origin',
-    extractionKeywords: ['brand', 'made by', 'manufactured', 'company', 'logo'],
-    confidenceThreshold: 0.8,
-  },
-  {
-    name: 'specs',
-    displayName: 'Technical Specifications',
-    description: 'Dimensions, capacity, power rating, voltage, wattage',
-    extractionKeywords: ['watts', 'volts', 'amps', 'capacity', 'size', 'dimensions', 'weight', 'BTU'],
-    confidenceThreshold: 0.8,
-  },
-  {
-    name: 'date_info',
-    displayName: 'Date Information',
-    description: 'Manufacturing date, purchase date, warranty expiration',
-    extractionKeywords: ['date', 'manufactured', 'MFG', 'warranty', 'expires', 'purchased'],
-    confidenceThreshold: 0.8,
-  },
-  {
-    name: 'condition',
-    displayName: 'Condition Assessment',
-    description: 'Physical state, wear indicators, damage',
-    extractionKeywords: ['new', 'good', 'fair', 'poor', 'damaged', 'worn', 'scratched', 'dented'],
-    confidenceThreshold: 0.7,
+    displayName: 'Item',
+    description: 'What the thing is, in plain language',
+    extractionKeywords: ['item', 'thing', 'stuff', 'this', 'these'],
+    confidenceThreshold: 0.6,
   },
   {
     name: 'location',
     displayName: 'Location',
-    description: 'Room, area, or storage location within home',
-    extractionKeywords: ['room', 'bedroom', 'kitchen', 'living', 'garage', 'basement', 'closet', 'attic'],
+    description: 'Where it is: room, area, specific spot',
+    extractionKeywords: ['room', 'shelf', 'drawer', 'cabinet', 'closet', 'bin', 'box', 'where'],
     confidenceThreshold: 0.7,
   },
   {
-    name: 'compliance',
-    displayName: 'Compliance/Safety Info',
-    description: 'UL listing, FCC ID, energy ratings, safety certifications',
-    extractionKeywords: ['UL', 'ETL', 'FCC', 'CE', 'Energy Star', 'rated', 'certified', 'approved'],
-    confidenceThreshold: 0.8,
+    name: 'container',
+    displayName: 'Container/Storage',
+    description: 'What it is stored in or on',
+    extractionKeywords: ['bin', 'box', 'drawer', 'shelf', 'cabinet', 'basket', 'bag', 'tub'],
+    confidenceThreshold: 0.6,
   },
   {
-    name: 'follow_up',
-    displayName: 'Follow-Up Needed',
-    description: 'Label not visible, angle needed, additional photo required',
-    extractionKeywords: ['unclear', 'partial', 'obscured', 'need better', 'retake'],
-    confidenceThreshold: 0.6,
+    name: 'note',
+    displayName: 'Note',
+    description: 'Any context about organization, ownership, or finding it',
+    extractionKeywords: ['note', 'remember', 'belongs', 'keep', 'stored', 'temporary'],
+    confidenceThreshold: 0.5,
   },
 ];
 
@@ -373,14 +338,12 @@ const genericPrompts = [
 ];
 
 const homeInventoryPrompts = [
-  'Read the serial number character by character - S/N colon...',
-  'Read the model number exactly as printed',
-  'Note the brand name and where it\'s displayed',
-  'Describe the condition - any scratches, dents, or wear?',
-  'What room or area is this item located in?',
-  'Check for labels on the back, bottom, or power cord',
-  'Look for manufacturing date or warranty stickers',
-  'Note the voltage and wattage if visible',
+  'What room are you in?',
+  'What shelf, drawer, or area is this?',
+  'What are you photographing?',
+  'Any tips for finding this later?',
+  'Who does this belong to?',
+  'Is this a permanent spot or temporary?',
 ];
 
 const travelLogPrompts = [
@@ -430,45 +393,85 @@ Provide specific observations for inventory documentation.`;
 const genericVisionPrompt = `Analyze this photo and describe the site conditions,
 notable features, and any observations relevant to environmental or engineering assessment.`;
 
-const homeInventoryVisionPrompt = `You are documenting household items for insurance inventory. Your PRIMARY goal is EXACT OCR extraction of all text visible on labels, tags, and screens.
+const homeInventoryVisionPrompt = `You are helping build a searchable home inventory. The goal is simple: help someone find things later.
 
-## OCR EXTRACTION RULES (CRITICAL)
-1. **Exact Characters Only**: Report EXACTLY what you see. "SN: ABC-123" not "serial number present"
-2. **Character Confidence**: If a character is unclear, use [?] placeholder: "Model: XK[?]7-2B"
-3. **Preserve Formatting**: Keep original formatting: "Model No. UN55TU7000FXZA" not "Model UN55TU7000FXZA"
-4. **Multiple Labels**: Extract from ALL visible labels, stickers, and screens
-5. **No Guessing**: If you can't read it, say "partially visible" or "obscured"
+## YOUR JOB
+1. Identify WHAT is in the photo (plain language, not technical)
+2. Note WHERE it is (be specific: room, area, shelf, drawer, container)
+3. Describe HOW to find it (visual landmarks, what's nearby)
+4. Extract any verbal context about location or organization
 
-## LABEL LOCATIONS TO CHECK
-- **Back/rear panel**: Main model plate, serial number sticker
-- **Bottom/underside**: FCC ID, UL listing, manufacturing info
-- **Power cord tag**: Voltage, wattage, cord specs
-- **Screen/display**: Model info, settings screens
-- **Packaging**: If visible - UPC barcode, SKU
-- **Warranty stickers**: Date stamps, service tags
+## DESCRIPTION GUIDELINES
+Write like you're telling someone where to find something:
+- "Blue KitchenAid stand mixer on the counter next to the stove"
+- "Holiday decorations in the large plastic bin, top shelf of garage shelving"
+- "Spare phone chargers in the junk drawer, kitchen island"
 
-## PHOTO QUALITY ASSESSMENT
-Rate label readability in your description: CLEAR (all text readable) | PARTIAL (some text unclear) | POOR (retake needed)
-If PARTIAL or POOR, specify in suggestedFollowUp exactly what angle/lighting needed.
+Be specific enough that someone unfamiliar with the house could find it.
 
-## STRUCTURED EXTRACTION FORMAT
-For the extractedData field, use pipe-separated key-value pairs:
-"Brand: Samsung | Model: UN55TU7000FXZA | Serial: Z4XT3ABC123456 | MFG Date: 2023-03 | Voltage: 120V 60Hz | Power: 145W"
+## LOCATION HIERARCHY
+Always try to capture:
+1. **Room**: kitchen, master bedroom, garage, basement, etc.
+2. **Area**: pantry, closet, under sink, by the window, etc.
+3. **Spot**: top shelf, left drawer, in the blue bin, behind the coats, etc.
 
-## WHAT TO CAPTURE (in priority order)
-1. **Identifiers**: Serial number (S/N), Model number (M/N), Part number (P/N), UPC/SKU
-2. **Manufacturer**: Brand name, logo text, country of manufacture
-3. **Specs**: Dimensions, capacity, power rating (volts/amps/watts)
-4. **Dates**: Manufacturing date, warranty period, purchase date (if receipt visible)
-5. **Compliance**: UL, ETL, FCC ID, Energy Star rating, CE mark
-6. **Condition**: Visible wear, damage, scratches, dents, stains
+## WHAT TO CAPTURE
+- Item name (common name, not model numbers)
+- Category (tools, kitchen, electronics, seasonal, etc.)
+- Color/size if helpful for finding
+- Container or storage (box, bin, drawer, shelf)
+- Quantity if multiple items
+- Any verbal notes from the person ("this is where we keep...")
 
-## RESPONSE PRIORITY
-1. Always extract identifiers first - critical for insurance claims
-2. Note what you CAN'T read and why (glare, angle, damage, small print)
-3. Include suggestedFollowUp if important info is not captured
+## WHAT TO SKIP
+- Serial numbers, model numbers, specs (unless specifically asked)
+- Insurance/replacement value
+- Technical specifications
+- Compliance markings
+- **Common low-value items** unless specifically mentioned in voice note:
+  - Basic kitchenware (utensils, plates, glasses, pots, pans)
+  - Standard toiletries and cleaning supplies
+  - Basic office supplies (pens, paper, tape)
+  - Everyday clothing items
+  - Generic decorative items
 
-Provide specific observations for insurance documentation and replacement value estimation.`;
+**EXCEPTION**: If the person mentions it ("this is where we keep the good knives"
+or "my grandmother's dishes"), then it's worth documenting.
+
+## SIGNAL WORDS THAT MAKE COMMON ITEMS WORTH NOTING
+- "good" / "nice" / "expensive" / "special"
+- "grandmother's" / "inherited" / "antique" / "vintage"
+- "collection" / "set" / "complete"
+- "hard to find" / "discontinued" / "custom"
+- "this is where we keep..."
+- Any named brand mentioned with intent
+
+## MULTIPLE ITEMS IN ONE PHOTO
+
+**Default behavior**: Describe the collection/storage, note notable items only
+- "Junk drawer in kitchen island - batteries, tape, scissors, misc"
+- "Bookshelf in office, mostly paperbacks and reference books"
+
+**When to itemize everything visible**:
+The voice note signals inventory intent with phrases like:
+- "here is the..." / "this drawer has..." / "this is where I keep..."
+- "all of my..." / "my collection of..."
+- "let me show you what's in here"
+- Listing items aloud as they photograph
+
+**Example**:
+Voice: "Here's the upper tool drawer"
+→ Output: "Upper tool drawer, kitchen" (summary)
+
+Voice: "Here's the upper tool drawer which has all of these tools"
+→ Output: Itemize what's visible (hammer, screwdrivers, tape measure, etc.)
+
+**Itemization format**:
+When itemizing, list items clearly in the description:
+"Upper tool drawer (left of stove): hammer, Phillips screwdriver set,
+tape measure, Allen keys, adjustable wrench, utility knife, small level"
+
+Create individual entities only for notable/valuable items. Group the rest in description.`;
 
 const travelLogVisionPrompt = `Analyze this travel photo and describe:
 - Location or landmark identification if recognizable

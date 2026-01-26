@@ -189,37 +189,32 @@ function buildCatalogTags(projectType: ProjectType, hasTranscript: boolean): str
     case 'home-inventory':
       return `   Include ALL relevant tags from these categories:
 
-   **Item Category:**
-   - electronics, tv, computer, laptop, tablet, phone, monitor, speaker, headphones, camera, gaming
-   - appliance, kitchen_appliance, laundry, hvac, refrigerator, washer, dryer, dishwasher, microwave, oven
-   - furniture, seating, table, storage, bed, desk, chair, sofa, cabinet, shelf, bookcase
-   - tools, power_tool, hand_tool, gardening, automotive
-   - clothing, jewelry, watch, accessories, handbag
-   - collectible, art, antique, memorabilia, musical_instrument
+   **Room:**
+   - kitchen, living_room, dining_room, bedroom, master_bedroom, kids_room, guest_room
+   - bathroom, garage, basement, attic, office, home_office, laundry_room
+   - closet, pantry, mudroom, entryway, patio, shed, workshop
 
-   **Location:**
-   - living_room, bedroom, master_bedroom, guest_room, kitchen, bathroom, garage, basement, attic
-   - home_office, closet, laundry_room, dining_room, entryway, patio, shed
-   - mounted, freestanding, built_in, portable
+   **Storage/Area:**
+   - drawer, shelf, cabinet, closet, bin, box, basket, bag, container
+   - rack, hook, mounted, counter, table, floor, wall
+   - top_shelf, bottom_shelf, upper_cabinet, lower_cabinet, under_sink
 
-   **Value Tier:**
-   - high_value, medium_value, standard_value, luxury, professional_grade, consumer_grade
+   **Category:**
+   - tools, kitchen_stuff, electronics, clothes, shoes, toys, games, books
+   - documents, seasonal, holiday, camping, sports, crafts, office_supplies
+   - cleaning, medicine, first_aid, pet_stuff, baby_stuff, linens, decor
 
-   **Condition:**
-   - new, like_new, good, fair, poor, damaged, needs_repair, refurbished
+   **Item Type:**
+   - appliance, furniture, device, equipment, supplies, accessories
+   - collection, set, pair, spare, backup
 
-   **OCR/Label Status:**
-   - serial_captured, model_captured, specs_captured
-   - label_clear, label_partial, label_obscured, label_missing
-   - barcode_visible, qr_visible, ocr_successful, ocr_partial, ocr_failed
-   - retake_needed, follow_up_photo
+   **Descriptors:**
+   - frequently_used, rarely_used, seasonal, everyday
+   - valuable, sentimental, inherited, antique
+   - bulk, organized, misc, junk_drawer
 
-   **Documentation:**
-   - receipt_visible, warranty_visible, manual_visible
-   - packaging_visible, price_tag_visible
-
-   **Insurance Relevance:**
-   - high_replacement_cost, specialized_item, paired_item, set_piece, insured_item`;
+   **Color (if helpful for finding):**
+   - red, blue, green, yellow, black, white, gray, brown, clear, multicolor`;
 
     case 'asset-tagging':
       return `   Include ALL relevant tags from these categories:
