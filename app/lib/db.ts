@@ -199,13 +199,37 @@ export async function deleteAudio(audioId: string): Promise<void> {
 export async function saveProcessingResult(result: ProcessingResult): Promise<void> {
   const db = await initDB();
   const tx = db.transaction('processing_results', 'readwrite');
-  await tx.objectStore('processing_results').add(result);
+  const store = tx.objectStore('processing_results');
+
+  return new Promise((resolve, reject) => {
+    const request = store.add(result);
+    request.onsuccess = () => {
+      console.log('[DB] ProcessingResult saved:', result.id);
+      resolve();
+    };
+    request.onerror = () => {
+      console.error('[DB] Failed to save ProcessingResult:', request.error);
+      reject(request.error);
+    };
+  });
 }
 
 export async function updateProcessingResult(result: ProcessingResult): Promise<void> {
   const db = await initDB();
   const tx = db.transaction('processing_results', 'readwrite');
-  await tx.objectStore('processing_results').put(result);
+  const store = tx.objectStore('processing_results');
+
+  return new Promise((resolve, reject) => {
+    const request = store.put(result);
+    request.onsuccess = () => {
+      console.log('[DB] ProcessingResult updated:', result.id, 'hasSynthesis:', !!result.synthesis);
+      resolve();
+    };
+    request.onerror = () => {
+      console.error('[DB] Failed to update ProcessingResult:', request.error);
+      reject(request.error);
+    };
+  });
 }
 
 export async function getSessionProcessingResult(sessionId: string): Promise<ProcessingResult | null> {
@@ -215,8 +239,19 @@ export async function getSessionProcessingResult(sessionId: string): Promise<Pro
 
   return new Promise((resolve, reject) => {
     const request = index.get(sessionId);
-    request.onsuccess = () => resolve(request.result || null);
-    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const result = request.result || null;
+      console.log('[DB] getSessionProcessingResult:', sessionId, result ? {
+        id: result.id,
+        status: result.status,
+        hasSynthesis: !!result.synthesis,
+      } : 'not found');
+      resolve(result);
+    };
+    request.onerror = () => {
+      console.error('[DB] getSessionProcessingResult error:', request.error);
+      reject(request.error);
+    };
   });
 }
 
