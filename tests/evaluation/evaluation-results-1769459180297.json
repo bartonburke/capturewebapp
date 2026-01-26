@@ -1,0 +1,499 @@
+{
+  "metadata": {
+    "run_id": "eval-1769459149675",
+    "started_at": "2026-01-26T20:25:49.675Z",
+    "completed_at": "2026-01-26T20:26:20.297Z",
+    "test_session": "eval-session-001",
+    "photos_tested": 2,
+    "models_tested": [
+      "gpt-4o",
+      "gpt-4o-mini",
+      "gemini-flash",
+      "gemini-pro"
+    ],
+    "prompts_tested": [
+      "current"
+    ]
+  },
+  "results": [
+    {
+      "photo_id": "photo-001",
+      "model_id": "gpt-4o",
+      "prompt_id": "current",
+      "timestamp": "2026-01-26T20:25:57.323Z",
+      "latency_ms": 7521,
+      "result": {
+        "room": "living room",
+        "area": "by the wall",
+        "container": null,
+        "items": [
+          {
+            "name": "white day bed",
+            "attributes": {
+              "status": "in-progress inversion"
+            }
+          },
+          {
+            "name": "painting of a dog",
+            "attributes": {}
+          },
+          {
+            "name": "cabinet with glass doors",
+            "attributes": {}
+          },
+          {
+            "name": "assorted items on cabinet",
+            "attributes": {}
+          },
+          {
+            "name": "hat",
+            "attributes": {
+              "color": "beige"
+            }
+          }
+        ],
+        "raw_response": "{\n  \"room\": \"living room\",\n  \"area\": \"by the wall\",\n  \"container\": null,\n  \"items\": [\n    {\n      \"name\": \"white day bed\",\n      \"attributes\": {\n        \"status\": \"in-progress inversion\"\n      }\n    },\n    {\n      \"name\": \"painting of a dog\",\n      \"attributes\": {}\n    },\n    {\n      \"name\": \"cabinet with glass doors\",\n      \"attributes\": {}\n    },\n    {\n      \"name\": \"assorted items on cabinet\",\n      \"attributes\": {}\n    },\n    {\n      \"name\": \"hat\",\n      \"attributes\": {\n        \"color\": \"beige\"\n      }\n    }\n  ]\n}"
+      },
+      "score": {
+        "format_compliance": 1,
+        "room_accuracy": 1,
+        "item_recall": 0.6666666666666666,
+        "item_precision": 1,
+        "practical_utility": 1,
+        "overall": 0.8833333333333333,
+        "details": {
+          "missing_fields": [],
+          "room_match": "exact",
+          "items_found": [
+            "hat",
+            "painting"
+          ],
+          "items_missed": [
+            "couch"
+          ],
+          "items_hallucinated": []
+        }
+      }
+    },
+    {
+      "photo_id": "photo-001",
+      "model_id": "gpt-4o-mini",
+      "prompt_id": "current",
+      "timestamp": "2026-01-26T20:26:00.786Z",
+      "latency_ms": 2960,
+      "result": {
+        "room": "living room",
+        "area": "near the door",
+        "container": null,
+        "items": [
+          {
+            "name": "white sofa",
+            "attributes": {}
+          },
+          {
+            "name": "dog painting",
+            "attributes": {
+              "type": "canvas"
+            }
+          },
+          {
+            "name": "wooden furniture",
+            "attributes": {
+              "type": "cabinet"
+            }
+          },
+          {
+            "name": "green bed slats",
+            "attributes": {}
+          }
+        ],
+        "raw_response": "{\n  \"room\": \"living room\",\n  \"area\": \"near the door\",\n  \"container\": null,\n  \"items\": [\n    {\"name\": \"white sofa\", \"attributes\": {}},\n    {\"name\": \"dog painting\", \"attributes\": {\"type\": \"canvas\"}},\n    {\"name\": \"wooden furniture\", \"attributes\": {\"type\": \"cabinet\"}},\n    {\"name\": \"green bed slats\", \"attributes\": {}}\n  ]\n}"
+      },
+      "score": {
+        "format_compliance": 1,
+        "room_accuracy": 1,
+        "item_recall": 0.3333333333333333,
+        "item_precision": 1,
+        "practical_utility": 1,
+        "overall": 0.7666666666666667,
+        "details": {
+          "missing_fields": [],
+          "room_match": "exact",
+          "items_found": [
+            "painting"
+          ],
+          "items_missed": [
+            "couch",
+            "hat"
+          ],
+          "items_hallucinated": []
+        }
+      }
+    },
+    {
+      "photo_id": "photo-001",
+      "model_id": "gemini-flash",
+      "prompt_id": "current",
+      "timestamp": "2026-01-26T20:26:04.268Z",
+      "latency_ms": 2970,
+      "result": {
+        "room": "bedroom",
+        "area": null,
+        "container": null,
+        "items": [
+          {
+            "name": "hat",
+            "attributes": {}
+          },
+          {
+            "name": "humidifier",
+            "attributes": {}
+          },
+          {
+            "name": "bedside table",
+            "attributes": {}
+          },
+          {
+            "name": "stool",
+            "attributes": {}
+          },
+          {
+            "name": "prison bed",
+            "attributes": {}
+          },
+          {
+            "name": "day bed",
+            "attributes": {}
+          },
+          {
+            "name": "painting of dog",
+            "attributes": {}
+          },
+          {
+            "name": "books",
+            "attributes": {}
+          },
+          {
+            "name": "side table",
+            "attributes": {}
+          }
+        ],
+        "raw_response": "```json\n[\n  {\n    \"room\": \"bedroom\",\n    \"area\": null,\n    \"container\": null,\n    \"items\": [\n      {\n        \"name\": \"hat\",\n        \"attributes\": {}\n      },\n      {\n        \"name\": \"humidifier\",\n        \"attributes\": {}\n      },\n      {\n        \"name\": \"bedside table\",\n        \"attributes\": {}\n      },\n      {\n        \"name\": \"stool\",\n        \"attributes\": {}\n      },\n      {\n        \"name\": \"prison bed\",\n        \"attributes\": {}\n      },\n      {\n        \"name\": \"day bed\",\n        \"attributes\": {}\n      },\n      {\n        \"name\": \"painting of dog\",\n        \"attributes\": {}\n      },\n      {\n        \"name\": \"books\",\n        \"attributes\": {}\n      },\n      {\n        \"name\": \"side table\",\n        \"attributes\": {}\n      }\n    ],\n    \"notes\": \"We have a hat, humidifier, bedside table made up, stools put together, prison bed, an in-progress inversion of a day bed.\"\n  }\n]\n```"
+      },
+      "score": {
+        "format_compliance": 1,
+        "room_accuracy": 0,
+        "item_recall": 0.6666666666666666,
+        "item_precision": 1,
+        "practical_utility": 0.75,
+        "overall": 0.5958333333333332,
+        "details": {
+          "missing_fields": [],
+          "room_match": "wrong",
+          "items_found": [
+            "hat",
+            "painting"
+          ],
+          "items_missed": [
+            "couch"
+          ],
+          "items_hallucinated": []
+        }
+      }
+    },
+    {
+      "photo_id": "photo-001",
+      "model_id": "gemini-pro",
+      "prompt_id": "current",
+      "timestamp": "2026-01-26T20:26:05.106Z",
+      "latency_ms": 335,
+      "result": {
+        "error": "[GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent: [404 Not Found] models/gemini-1.5-pro is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods."
+      },
+      "score": {
+        "format_compliance": 0,
+        "room_accuracy": 0,
+        "item_recall": 0,
+        "item_precision": 1,
+        "practical_utility": 0,
+        "overall": 0.1,
+        "details": {
+          "missing_fields": [
+            "room",
+            "area",
+            "container",
+            "items"
+          ],
+          "room_match": "wrong",
+          "items_found": [],
+          "items_missed": [
+            "couch",
+            "hat",
+            "painting"
+          ],
+          "items_hallucinated": []
+        }
+      }
+    },
+    {
+      "photo_id": "photo-002",
+      "model_id": "gpt-4o",
+      "prompt_id": "current",
+      "timestamp": "2026-01-26T20:26:12.425Z",
+      "latency_ms": 6814,
+      "result": {
+        "room": "bedroom",
+        "area": "by the bed",
+        "container": null,
+        "items": [
+          {
+            "name": "bed",
+            "attributes": {
+              "type": "daybed",
+              "status": "in-progress conversion"
+            }
+          },
+          {
+            "name": "pillow",
+            "attributes": {
+              "color": "green"
+            }
+          },
+          {
+            "name": "bedside table",
+            "attributes": {}
+          },
+          {
+            "name": "lamp",
+            "attributes": {}
+          },
+          {
+            "name": "hat",
+            "attributes": {}
+          },
+          {
+            "name": "humidifier",
+            "attributes": {}
+          }
+        ],
+        "raw_response": "{\n  \"room\": \"bedroom\",\n  \"area\": \"by the bed\",\n  \"container\": null,\n  \"items\": [\n    {\"name\": \"bed\", \"attributes\": {\"type\": \"daybed\", \"status\": \"in-progress conversion\"}},\n    {\"name\": \"pillow\", \"attributes\": {\"color\": \"green\"}},\n    {\"name\": \"bedside table\", \"attributes\": {}},\n    {\"name\": \"lamp\", \"attributes\": {}},\n    {\"name\": \"hat\", \"attributes\": {}},\n    {\"name\": \"humidifier\", \"attributes\": {}}\n  ]\n}"
+      },
+      "score": {
+        "format_compliance": 1,
+        "room_accuracy": 1,
+        "item_recall": 1,
+        "item_precision": 1,
+        "practical_utility": 1,
+        "overall": 1,
+        "details": {
+          "missing_fields": [],
+          "room_match": "exact",
+          "items_found": [
+            "bed",
+            "bedside table"
+          ],
+          "items_missed": [],
+          "items_hallucinated": []
+        }
+      }
+    },
+    {
+      "photo_id": "photo-002",
+      "model_id": "gpt-4o-mini",
+      "prompt_id": "current",
+      "timestamp": "2026-01-26T20:26:16.195Z",
+      "latency_ms": 3266,
+      "result": {
+        "room": "bedroom",
+        "area": null,
+        "container": null,
+        "items": [
+          {
+            "name": "bed",
+            "attributes": {
+              "type": "day bed"
+            }
+          },
+          {
+            "name": "pillow",
+            "attributes": {
+              "color": "green"
+            }
+          },
+          {
+            "name": "bedspread",
+            "attributes": {
+              "color": "white"
+            }
+          },
+          {
+            "name": "lamp",
+            "attributes": {}
+          },
+          {
+            "name": "bedside table",
+            "attributes": {}
+          }
+        ],
+        "raw_response": "{\n  \"room\": \"bedroom\",\n  \"area\": null,\n  \"container\": null,\n  \"items\": [\n    {\"name\": \"bed\", \"attributes\": {\"type\": \"day bed\"}},\n    {\"name\": \"pillow\", \"attributes\": {\"color\": \"green\"}},\n    {\"name\": \"bedspread\", \"attributes\": {\"color\": \"white\"}},\n    {\"name\": \"lamp\", \"attributes\": {}},\n    {\"name\": \"bedside table\", \"attributes\": {}}\n  ]\n}"
+      },
+      "score": {
+        "format_compliance": 1,
+        "room_accuracy": 1,
+        "item_recall": 1,
+        "item_precision": 1,
+        "practical_utility": 0.75,
+        "overall": 0.9624999999999999,
+        "details": {
+          "missing_fields": [],
+          "room_match": "exact",
+          "items_found": [
+            "bed",
+            "bedside table"
+          ],
+          "items_missed": [],
+          "items_hallucinated": []
+        }
+      }
+    },
+    {
+      "photo_id": "photo-002",
+      "model_id": "gemini-flash",
+      "prompt_id": "current",
+      "timestamp": "2026-01-26T20:26:19.099Z",
+      "latency_ms": 2401,
+      "result": {
+        "room": "bedroom",
+        "area": "near bed",
+        "container": null,
+        "items": [
+          {
+            "name": "bed",
+            "attributes": {}
+          },
+          {
+            "name": "pillow",
+            "attributes": {}
+          },
+          {
+            "name": "pillow",
+            "attributes": {}
+          },
+          {
+            "name": "lamp",
+            "attributes": {}
+          },
+          {
+            "name": "bedside table",
+            "attributes": {}
+          },
+          {
+            "name": "hat",
+            "attributes": {}
+          },
+          {
+            "name": "humidifier",
+            "attributes": {}
+          }
+        ],
+        "notes": "The person mentioned a hat, humidifier, bedside table made up, stools put together, prison bed, an in-progress inversion of a day bed.",
+        "raw_response": "```json\n{\n  \"room\": \"bedroom\",\n  \"area\": \"near bed\",\n  \"container\": null,\n  \"items\": [\n    {\"name\": \"bed\", \"attributes\": {}},\n    {\"name\": \"pillow\", \"attributes\": {}},\n    {\"name\": \"pillow\", \"attributes\": {}},\n    {\"name\": \"lamp\", \"attributes\": {}},\n    {\"name\": \"bedside table\", \"attributes\": {}},\n    {\"name\": \"hat\", \"attributes\": {}},\n    {\"name\": \"humidifier\", \"attributes\": {}}\n  ],\n  \"notes\": \"The person mentioned a hat, humidifier, bedside table made up, stools put together, prison bed, an in-progress inversion of a day bed.\"\n}\n```"
+      },
+      "score": {
+        "format_compliance": 1,
+        "room_accuracy": 1,
+        "item_recall": 1,
+        "item_precision": 1,
+        "practical_utility": 1,
+        "overall": 1,
+        "details": {
+          "missing_fields": [],
+          "room_match": "exact",
+          "items_found": [
+            "bed",
+            "bedside table"
+          ],
+          "items_missed": [],
+          "items_hallucinated": []
+        }
+      }
+    },
+    {
+      "photo_id": "photo-002",
+      "model_id": "gemini-pro",
+      "prompt_id": "current",
+      "timestamp": "2026-01-26T20:26:19.796Z",
+      "latency_ms": 195,
+      "result": {
+        "error": "[GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent: [404 Not Found] models/gemini-1.5-pro is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods."
+      },
+      "score": {
+        "format_compliance": 0,
+        "room_accuracy": 0,
+        "item_recall": 0,
+        "item_precision": 1,
+        "practical_utility": 0,
+        "overall": 0.1,
+        "details": {
+          "missing_fields": [
+            "room",
+            "area",
+            "container",
+            "items"
+          ],
+          "room_match": "wrong",
+          "items_found": [],
+          "items_missed": [
+            "bed",
+            "bedside table"
+          ],
+          "items_hallucinated": []
+        }
+      }
+    }
+  ],
+  "summary": {
+    "by_model": {
+      "gpt-4o": {
+        "avg_score": 0.9416666666666667,
+        "avg_latency_ms": 7167.5,
+        "runs": 2
+      },
+      "gpt-4o-mini": {
+        "avg_score": 0.8645833333333333,
+        "avg_latency_ms": 3113,
+        "runs": 2
+      },
+      "gemini-flash": {
+        "avg_score": 0.7979166666666666,
+        "avg_latency_ms": 2685.5,
+        "runs": 2
+      },
+      "gemini-pro": {
+        "avg_score": 0.1,
+        "avg_latency_ms": 265,
+        "runs": 2
+      }
+    },
+    "by_prompt": {
+      "current": {
+        "avg_score": 0.6760416666666667,
+        "avg_latency_ms": 3307.75,
+        "runs": 8
+      }
+    },
+    "by_photo": {
+      "photo-001": {
+        "avg_score": 0.5864583333333333
+      },
+      "photo-002": {
+        "avg_score": 0.765625
+      }
+    },
+    "best_combination": {
+      "model": "gpt-4o",
+      "prompt": "current",
+      "score": 1
+    }
+  }
+}

@@ -1,0 +1,434 @@
+{
+  "description": "Evaluation fixture for testing vision models and prompts on home inventory capture",
+  "version": "2.0",
+  "created": "2026-01-26",
+  "session_id": "eval-session-002",
+  "project_type": "home-inventory",
+  "project_name": "Model Evaluation Test - Basement Suite",
+
+  "transcript": "Okay, we're going to be capturing the whole basement area. Here you have the main room with the entrance, our dog and the chest, the TV, table and couch, the door into the bedroom area, an additional sleeping area, the washer, dryer, Samsung, the LG, a mini fridge. Here we have the kitchen unit with a hot plate on top. Here we have the silverware drawer and other random items for kitchen use. Here we have the dishes. Down here we have the pots and pans and a toaster. Here we have the bathroom. Here is the above the toilet storage. We have the bedroom with a work area. Here we have the closet. Here we have a work-in-progress conversion of a couch to a daybed.",
+
+  "photos": [
+    {
+      "id": "photo-001",
+      "source_file": "../../evidence/sessions/test-capture-session/photos/001-a-work-in-progress-conversion-.jpg",
+      "description": "Couch being converted to daybed - wooden frame with green straps, dog in background",
+      "timestamp": "2026-01-26T21:05:05.590Z",
+      "gps": { "latitude": 33.72503, "longitude": -118.30537, "accuracy": 16 },
+      "compass": { "heading": 226 },
+      "transcript_context": "Here we have a work-in-progress conversion of a couch to a daybed."
+    },
+    {
+      "id": "photo-002",
+      "source_file": "../../evidence/sessions/test-capture-session/photos/002-a-cluttered-closet-with-variou.jpg",
+      "description": "Closet with shelves of folded clothes, hanging jackets, laundry baskets, suitcase",
+      "timestamp": "2026-01-26T21:05:00.603Z",
+      "gps": { "latitude": 33.72518, "longitude": -118.30550, "accuracy": 8 },
+      "compass": { "heading": 319 },
+      "transcript_context": "Here we have the closet."
+    },
+    {
+      "id": "photo-003",
+      "source_file": "../../evidence/sessions/test-capture-session/photos/003-home-office-set-up-with-a-comp.jpg",
+      "description": "Home office with desk, external monitor, laptop, office chair, desk lamp, plant",
+      "timestamp": "2026-01-26T21:04:55.197Z",
+      "gps": { "latitude": 33.72515, "longitude": -118.30549, "accuracy": 10 },
+      "compass": { "heading": 16 },
+      "transcript_context": "We have the bedroom with a work area."
+    },
+    {
+      "id": "photo-004",
+      "source_file": "../../evidence/sessions/test-capture-session/photos/004-a-bedroom-with-a-work-area--fe.jpg",
+      "description": "Bedroom with bed frame, desk with computer, clothes on floor",
+      "timestamp": "2026-01-26T21:04:51.726Z",
+      "gps": { "latitude": 33.72514, "longitude": -118.30551, "accuracy": 10 },
+      "compass": { "heading": 24 },
+      "transcript_context": "We have the bedroom with a work area."
+    },
+    {
+      "id": "photo-005",
+      "source_file": "../../evidence/sessions/test-capture-session/photos/005-bathroom-storage-with-various-.jpg",
+      "description": "Bathroom shelf with shampoo, sunscreen, loofah, cotton pads, minoxidil, Nikwax",
+      "timestamp": "2026-01-26T21:04:37.964Z",
+      "gps": { "latitude": 33.72517, "longitude": -118.30552, "accuracy": 8 },
+      "compass": { "heading": 236 },
+      "transcript_context": "Here we have the bathroom."
+    },
+    {
+      "id": "photo-006",
+      "source_file": "../../evidence/sessions/test-capture-session/photos/006-a-white-cabinet-mounted-on-the.jpg",
+      "description": "White wall-mounted cabinet above toilet",
+      "timestamp": "2026-01-26T21:04:33.426Z",
+      "gps": { "latitude": 33.72520, "longitude": -118.30554, "accuracy": 8 },
+      "compass": { "heading": 263 },
+      "transcript_context": "Here is the above the toilet storage."
+    },
+    {
+      "id": "photo-007",
+      "source_file": "../../evidence/sessions/test-capture-session/photos/007-a-small-bathroom-featuring-a-s.jpg",
+      "description": "Bathroom with sink, mirror, toiletries, cleaning supplies",
+      "timestamp": "2026-01-26T21:04:29.190Z",
+      "gps": { "latitude": 33.72518, "longitude": -118.30554, "accuracy": 8 },
+      "compass": { "heading": 150 },
+      "transcript_context": "Here we have the bathroom."
+    },
+    {
+      "id": "photo-008",
+      "source_file": "../../evidence/sessions/test-capture-session/photos/008-various-pots--pans--a-bottle-o.jpg",
+      "description": "Kitchen cabinet with pots, pans, olive oil, toaster",
+      "timestamp": "2026-01-26T21:04:21.895Z",
+      "gps": { "latitude": 33.72516, "longitude": -118.30550, "accuracy": 8 },
+      "compass": { "heading": 230 },
+      "transcript_context": "Down here we have the pots and pans and a toaster."
+    },
+    {
+      "id": "photo-009",
+      "source_file": "../../evidence/sessions/test-capture-session/photos/009-kitchen-shelf-filled-with-dish.jpg",
+      "description": "Kitchen shelf unit with dishes, bowls, mugs, wine glasses, teapot, decorative statue",
+      "timestamp": "2026-01-26T21:04:15.265Z",
+      "gps": { "latitude": 33.72511, "longitude": -118.30542, "accuracy": 7 },
+      "compass": { "heading": 240 },
+      "transcript_context": "Here we have the dishes."
+    },
+    {
+      "id": "photo-010",
+      "source_file": "../../evidence/sessions/test-capture-session/photos/010-a-kitchen-drawer-containing-va.jpg",
+      "description": "Kitchen drawer with Reynolds Wrap, Saran wrap, matches, wooden spoon, scissors, woven bag",
+      "timestamp": "2026-01-26T21:04:08.005Z",
+      "gps": { "latitude": 33.72507, "longitude": -118.30542, "accuracy": 6 },
+      "compass": { "heading": 249 },
+      "transcript_context": "Here we have the silverware drawer and other random items for kitchen use."
+    },
+    {
+      "id": "photo-013",
+      "source_file": "../../evidence/sessions/test-capture-session/photos/013-a-mini-fridge-by-the-kitchen-c.jpg",
+      "description": "Mini fridge next to kitchen counter",
+      "timestamp": "2026-01-26T21:03:56.756Z",
+      "gps": { "latitude": 33.72499, "longitude": -118.30534, "accuracy": 5 },
+      "compass": { "heading": 185 },
+      "transcript_context": "...the LG, a mini fridge."
+    },
+    {
+      "id": "photo-016",
+      "source_file": "../../evidence/sessions/test-capture-session/photos/016-laundry-area-with-appliances-a.jpg",
+      "description": "Laundry area with Samsung washer, LG dryer, wooden cabinets, Instant Pot, laundry basket",
+      "timestamp": "2026-01-26T21:03:49.520Z",
+      "gps": { "latitude": 33.72499, "longitude": -118.30527, "accuracy": 26 },
+      "compass": { "heading": 246 },
+      "transcript_context": "...the washer, dryer, Samsung, the LG..."
+    },
+    {
+      "id": "photo-017",
+      "source_file": "../../evidence/sessions/test-capture-session/photos/017-a-cluttered-bedroom-area-with-.jpg",
+      "description": "Bedroom area with bed, lamp, small table, yellow cabinet, decorative items",
+      "timestamp": "2026-01-26T21:03:46.442Z",
+      "gps": { "latitude": 33.72500, "longitude": -118.30532, "accuracy": 35 },
+      "compass": { "heading": 287 },
+      "transcript_context": "...the door into the bedroom area, an additional sleeping area..."
+    }
+  ],
+
+  "expected_outputs": {
+    "description": "Human-verified expected results for evaluating model outputs",
+    "photos": {
+      "photo-001": {
+        "room": "living room",
+        "area": "floor",
+        "container": null,
+        "items": [
+          { "name": "couch frame", "notes": "being converted to daybed" },
+          { "name": "white fabric/upholstery" },
+          { "name": "green webbing straps" },
+          { "name": "dog", "notes": "small white dog in background" },
+          { "name": "jute rug" }
+        ],
+        "must_identify": ["couch", "dog"],
+        "should_identify": ["frame", "rug", "straps"],
+        "room_confidence": "high"
+      },
+      "photo-002": {
+        "room": "bedroom",
+        "area": "closet",
+        "container": "closet shelves",
+        "items": [
+          { "name": "shirts", "notes": "folded on shelves" },
+          { "name": "pants" },
+          { "name": "jackets", "notes": "hanging" },
+          { "name": "sweaters" },
+          { "name": "laundry basket", "notes": "wicker" },
+          { "name": "suitcase" },
+          { "name": "storage bins" }
+        ],
+        "must_identify": ["clothes", "shelves", "laundry basket"],
+        "should_identify": ["suitcase", "jackets", "shirts"],
+        "room_confidence": "high"
+      },
+      "photo-003": {
+        "room": "office",
+        "area": "desk area",
+        "container": "desk",
+        "items": [
+          { "name": "external monitor" },
+          { "name": "laptop" },
+          { "name": "office chair", "notes": "white with black cushion" },
+          { "name": "desk lamp" },
+          { "name": "potted plant" },
+          { "name": "water glass" },
+          { "name": "keyboard" },
+          { "name": "mouse" },
+          { "name": "framed picture" }
+        ],
+        "must_identify": ["monitor", "laptop", "desk", "chair"],
+        "should_identify": ["lamp", "plant", "keyboard"],
+        "room_confidence": "high",
+        "room_alternatives": ["bedroom", "home office"]
+      },
+      "photo-004": {
+        "room": "bedroom",
+        "area": "bed and desk area",
+        "container": null,
+        "items": [
+          { "name": "bed frame" },
+          { "name": "desk" },
+          { "name": "computer" },
+          { "name": "chair" },
+          { "name": "clothes", "notes": "on floor" },
+          { "name": "hat" }
+        ],
+        "must_identify": ["bed", "desk", "computer"],
+        "should_identify": ["chair", "clothes"],
+        "room_confidence": "high"
+      },
+      "photo-005": {
+        "room": "bathroom",
+        "area": "shelf",
+        "container": "bathroom shelf",
+        "items": [
+          { "name": "shampoo", "notes": "coconut milk shampoo" },
+          { "name": "sunscreen", "notes": "Banana Boat Kids" },
+          { "name": "loofah" },
+          { "name": "spray bottle" },
+          { "name": "cotton pads" },
+          { "name": "minoxidil", "notes": "Kirkland brand" },
+          { "name": "Nikwax", "notes": "waterproofing products" }
+        ],
+        "must_identify": ["shampoo", "sunscreen", "shelf"],
+        "should_identify": ["loofah", "minoxidil", "cotton pads"],
+        "room_confidence": "high"
+      },
+      "photo-006": {
+        "room": "bathroom",
+        "area": "above toilet",
+        "container": "wall cabinet",
+        "items": [
+          { "name": "white cabinet", "notes": "wall-mounted" }
+        ],
+        "must_identify": ["cabinet"],
+        "should_identify": ["wall-mounted"],
+        "room_confidence": "high"
+      },
+      "photo-007": {
+        "room": "bathroom",
+        "area": "sink area",
+        "container": null,
+        "items": [
+          { "name": "sink" },
+          { "name": "mirror" },
+          { "name": "toiletries" },
+          { "name": "cleaning supplies" },
+          { "name": "towel" }
+        ],
+        "must_identify": ["sink", "mirror", "bathroom"],
+        "should_identify": ["toiletries", "towel"],
+        "room_confidence": "high"
+      },
+      "photo-008": {
+        "room": "kitchen",
+        "area": "lower cabinet",
+        "container": "cabinet",
+        "items": [
+          { "name": "pots" },
+          { "name": "pans" },
+          { "name": "olive oil" },
+          { "name": "toaster" }
+        ],
+        "must_identify": ["pots", "pans", "cabinet"],
+        "should_identify": ["toaster", "olive oil"],
+        "room_confidence": "high"
+      },
+      "photo-009": {
+        "room": "kitchen",
+        "area": "shelf unit",
+        "container": "wooden shelf",
+        "items": [
+          { "name": "wine glasses" },
+          { "name": "bowls", "notes": "white" },
+          { "name": "mugs" },
+          { "name": "dinner plates", "notes": "white" },
+          { "name": "teapot", "notes": "cast iron, on top" },
+          { "name": "decorative statue", "notes": "on top of shelf" },
+          { "name": "wine bottle" },
+          { "name": "paper towels" }
+        ],
+        "must_identify": ["dishes", "shelf", "bowls", "plates"],
+        "should_identify": ["wine glasses", "mugs", "teapot"],
+        "room_confidence": "high"
+      },
+      "photo-010": {
+        "room": "kitchen",
+        "area": "drawer",
+        "container": "kitchen drawer",
+        "items": [
+          { "name": "Reynolds Wrap", "notes": "aluminum foil" },
+          { "name": "Saran wrap", "notes": "plastic wrap" },
+          { "name": "matches", "notes": "Diamond brand" },
+          { "name": "dish brush" },
+          { "name": "wooden spoon" },
+          { "name": "scissors" },
+          { "name": "woven bag" }
+        ],
+        "must_identify": ["drawer", "aluminum foil", "plastic wrap"],
+        "should_identify": ["scissors", "wooden spoon", "matches"],
+        "room_confidence": "high"
+      },
+      "photo-013": {
+        "room": "kitchen",
+        "area": "counter area",
+        "container": null,
+        "items": [
+          { "name": "mini fridge" },
+          { "name": "glass water bottle" },
+          { "name": "white plate" }
+        ],
+        "must_identify": ["mini fridge", "kitchen"],
+        "should_identify": ["water bottle"],
+        "room_confidence": "high"
+      },
+      "photo-016": {
+        "room": "laundry",
+        "area": "main area",
+        "container": "wooden cabinets",
+        "items": [
+          { "name": "washer", "notes": "Samsung, front-loading" },
+          { "name": "dryer", "notes": "LG, white" },
+          { "name": "wooden cabinets" },
+          { "name": "Instant Pot" },
+          { "name": "laundry basket", "notes": "with clothes" },
+          { "name": "cutting board" },
+          { "name": "decorative branches" }
+        ],
+        "must_identify": ["washer", "dryer", "cabinets"],
+        "should_identify": ["Instant Pot", "laundry basket"],
+        "room_confidence": "high",
+        "room_alternatives": ["basement", "utility room"]
+      },
+      "photo-017": {
+        "room": "bedroom",
+        "area": "sleeping area",
+        "container": null,
+        "items": [
+          { "name": "bed" },
+          { "name": "lamp" },
+          { "name": "side table" },
+          { "name": "yellow cabinet" },
+          { "name": "decorative plants" },
+          { "name": "clothes" },
+          { "name": "hat" },
+          { "name": "cushions" }
+        ],
+        "must_identify": ["bed", "lamp", "table"],
+        "should_identify": ["cabinet", "plants"],
+        "room_confidence": "high"
+      }
+    }
+  },
+
+  "evaluation_criteria": {
+    "format_compliance": {
+      "description": "Does output contain required fields?",
+      "required_fields": ["room", "area", "container", "items"],
+      "items_must_have": ["name"],
+      "items_may_have": ["attributes", "notes", "color", "brand"]
+    },
+    "room_accuracy": {
+      "description": "Did it correctly identify the room?",
+      "scoring": {
+        "exact_match": 1.0,
+        "acceptable_alternative": 0.8,
+        "wrong_but_close": 0.3,
+        "completely_wrong": 0.0
+      }
+    },
+    "item_recall": {
+      "description": "What fraction of must_identify items were found?",
+      "weight": 0.4
+    },
+    "item_precision": {
+      "description": "What fraction of identified items are real?",
+      "weight": 0.3,
+      "penalize_hallucinations": true
+    },
+    "practical_utility": {
+      "description": "Would this help someone find their stuff?",
+      "weight": 0.3,
+      "criteria": [
+        "Item names are searchable/common terms",
+        "Location is specific enough to navigate to",
+        "No overly technical or verbose descriptions"
+      ]
+    }
+  },
+
+  "prompts_to_test": [
+    {
+      "id": "current",
+      "name": "Current Production Prompt",
+      "source": "app/lib/defaultContexts.ts:homeInventoryVisionPrompt",
+      "prompt": null
+    },
+    {
+      "id": "minimal",
+      "name": "Minimal Prompt",
+      "prompt": "List the room, what area of the room, any container, and items visible. Output JSON."
+    },
+    {
+      "id": "structured",
+      "name": "Structured with Examples",
+      "prompt": "Analyze this photo for home inventory.\n\nReturn JSON with:\n- room: string (kitchen, bedroom, garage, etc.)\n- area: string or null (where in room)\n- container: string or null (drawer, shelf, bin, etc.)\n- items: array of {name: string, attributes?: object}\n\nExample output:\n{\"room\": \"kitchen\", \"area\": \"counter\", \"container\": null, \"items\": [{\"name\": \"toaster\"}, {\"name\": \"knife block\"}]}"
+    },
+    {
+      "id": "finding-focused",
+      "name": "Finding-Focused",
+      "prompt": "You're helping someone find things in their home later. For this photo:\n1. What room is this?\n2. Where exactly in the room?\n3. Is there a container (drawer, box, shelf)?\n4. List every findable item using common search terms.\n\nBe specific about location. Use names people would search for."
+    }
+  ],
+
+  "models_to_test": [
+    {
+      "id": "gpt-4o",
+      "provider": "openai",
+      "model": "gpt-4o",
+      "notes": "OpenAI flagship vision model"
+    },
+    {
+      "id": "gpt-4o-mini",
+      "provider": "openai",
+      "model": "gpt-4o-mini",
+      "notes": "Cheaper OpenAI option"
+    },
+    {
+      "id": "gemini-flash",
+      "provider": "google",
+      "model": "gemini-2.0-flash",
+      "notes": "Fast Gemini model - best value in previous tests"
+    }
+  ],
+
+  "notes": [
+    "Photos are from test-capture-session (basement suite)",
+    "22 photos captured, 13 with clear content included in test",
+    "Covers: living room, bedroom, closet, office, bathroom, kitchen, laundry",
+    "Transcript provides context for all photos",
+    "Expected outputs are human-verified ground truth"
+  ]
+}

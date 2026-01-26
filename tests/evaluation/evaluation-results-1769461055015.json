@@ -1,0 +1,439 @@
+{
+  "metadata": {
+    "run_id": "eval-1769461026757",
+    "started_at": "2026-01-26T20:57:06.757Z",
+    "completed_at": "2026-01-26T20:57:35.015Z",
+    "test_session": "eval-session-001",
+    "photos_tested": 2,
+    "models_tested": [
+      "gpt-4o",
+      "gpt-4o-mini",
+      "gemini-flash"
+    ],
+    "prompts_tested": [
+      "current"
+    ]
+  },
+  "results": [
+    {
+      "photo_id": "photo-001",
+      "model_id": "gpt-4o",
+      "prompt_id": "current",
+      "timestamp": "2026-01-26T20:57:12.616Z",
+      "latency_ms": 5692,
+      "tokens": {
+        "input_tokens": 533,
+        "output_tokens": 130,
+        "image_tokens": 1
+      },
+      "cost_usd": 0.0039075,
+      "result": {
+        "room": "bedroom",
+        "area": "near cabinet and door",
+        "container": null,
+        "items": [
+          {
+            "name": "white leather couch",
+            "attributes": {}
+          },
+          {
+            "name": "painting of a dog",
+            "attributes": {}
+          },
+          {
+            "name": "stacked furniture parts",
+            "attributes": {}
+          },
+          {
+            "name": "cabinet",
+            "attributes": {
+              "type": "glass doors"
+            }
+          }
+        ],
+        "notes": "In-progress inversion of a day bed mentioned.",
+        "raw_response": "{\n  \"room\": \"bedroom\",\n  \"area\": \"near cabinet and door\",\n  \"container\": null,\n  \"items\": [\n    {\n      \"name\": \"white leather couch\",\n      \"attributes\": {}\n    },\n    {\n      \"name\": \"painting of a dog\",\n      \"attributes\": {}\n    },\n    {\n      \"name\": \"stacked furniture parts\",\n      \"attributes\": {}\n    },\n    {\n      \"name\": \"cabinet\",\n      \"attributes\": {\n        \"type\": \"glass doors\"\n      }\n    }\n  ],\n  \"notes\": \"In-progress inversion of a day bed mentioned.\"\n}"
+      },
+      "score": {
+        "format_compliance": 1,
+        "room_accuracy": 0,
+        "item_recall": 0.6666666666666666,
+        "item_precision": 1,
+        "practical_utility": 1,
+        "overall": 0.6333333333333333,
+        "details": {
+          "missing_fields": [],
+          "room_match": "wrong",
+          "items_found": [
+            "couch",
+            "painting"
+          ],
+          "items_missed": [
+            "hat"
+          ],
+          "items_hallucinated": []
+        }
+      }
+    },
+    {
+      "photo_id": "photo-001",
+      "model_id": "gpt-4o-mini",
+      "prompt_id": "current",
+      "timestamp": "2026-01-26T20:57:16.235Z",
+      "latency_ms": 3115,
+      "tokens": {
+        "input_tokens": 3281,
+        "output_tokens": 73,
+        "image_tokens": 1
+      },
+      "cost_usd": 0.00117395,
+      "result": {
+        "room": "living room",
+        "area": "near the wall",
+        "container": null,
+        "items": [
+          {
+            "name": "white couch",
+            "attributes": {}
+          },
+          {
+            "name": "painting of a dog",
+            "attributes": {}
+          },
+          {
+            "name": "bed frame",
+            "attributes": {}
+          }
+        ],
+        "raw_response": "{\n  \"room\": \"living room\",\n  \"area\": \"near the wall\",\n  \"container\": null,\n  \"items\": [\n    {\"name\": \"white couch\", \"attributes\": {}},\n    {\"name\": \"painting of a dog\", \"attributes\": {}},\n    {\"name\": \"bed frame\", \"attributes\": {}}\n  ]\n}"
+      },
+      "score": {
+        "format_compliance": 1,
+        "room_accuracy": 1,
+        "item_recall": 0.6666666666666666,
+        "item_precision": 1,
+        "practical_utility": 1,
+        "overall": 0.8833333333333333,
+        "details": {
+          "missing_fields": [],
+          "room_match": "exact",
+          "items_found": [
+            "couch",
+            "painting"
+          ],
+          "items_missed": [
+            "hat"
+          ],
+          "items_hallucinated": []
+        }
+      }
+    },
+    {
+      "photo_id": "photo-001",
+      "model_id": "gemini-flash",
+      "prompt_id": "current",
+      "timestamp": "2026-01-26T20:57:19.834Z",
+      "latency_ms": 3089,
+      "tokens": {
+        "input_tokens": 2274,
+        "output_tokens": 185
+      },
+      "cost_usd": 0.0003014,
+      "result": {
+        "room": "living room",
+        "area": "by wall",
+        "container": null,
+        "items": [
+          {
+            "name": "white sofa",
+            "attributes": {}
+          },
+          {
+            "name": "painting of dog",
+            "attributes": {}
+          },
+          {
+            "name": "cabinet",
+            "attributes": {}
+          },
+          {
+            "name": "books",
+            "attributes": {}
+          },
+          {
+            "name": "tools",
+            "attributes": {}
+          },
+          {
+            "name": "hat",
+            "attributes": {}
+          }
+        ],
+        "raw_response": "```json\n[\n  {\n    \"room\": \"living room\",\n    \"area\": \"by wall\",\n    \"container\": null,\n    \"items\": [\n      {\n        \"name\": \"white sofa\",\n        \"attributes\": {}\n      },\n      {\n        \"name\": \"painting of dog\",\n        \"attributes\": {}\n      },\n      {\n        \"name\": \"cabinet\",\n        \"attributes\": {}\n      },\n      {\n        \"name\": \"books\",\n        \"attributes\": {}\n      },\n      {\n        \"name\": \"tools\",\n        \"attributes\": {}\n      },\n      {\n        \"name\": \"hat\",\n        \"attributes\": {}\n      }\n    ],\n    \"notes\": \"hat, inversion of a day bed\"\n  }\n]\n```"
+      },
+      "score": {
+        "format_compliance": 1,
+        "room_accuracy": 1,
+        "item_recall": 0.6666666666666666,
+        "item_precision": 1,
+        "practical_utility": 1,
+        "overall": 0.8833333333333333,
+        "details": {
+          "missing_fields": [],
+          "room_match": "exact",
+          "items_found": [
+            "hat",
+            "painting"
+          ],
+          "items_missed": [
+            "couch"
+          ],
+          "items_hallucinated": []
+        }
+      }
+    },
+    {
+      "photo_id": "photo-002",
+      "model_id": "gpt-4o",
+      "prompt_id": "current",
+      "timestamp": "2026-01-26T20:57:27.413Z",
+      "latency_ms": 7076,
+      "tokens": {
+        "input_tokens": 533,
+        "output_tokens": 160,
+        "image_tokens": 1
+      },
+      "cost_usd": 0.0042075,
+      "result": {
+        "room": "bedroom",
+        "area": "bed area",
+        "container": null,
+        "items": [
+          {
+            "name": "bed",
+            "attributes": {}
+          },
+          {
+            "name": "cream bedsheets",
+            "attributes": {}
+          },
+          {
+            "name": "pillow",
+            "attributes": {}
+          },
+          {
+            "name": "gray decorative pillow",
+            "attributes": {}
+          },
+          {
+            "name": "lamp",
+            "attributes": {}
+          },
+          {
+            "name": "bedside table",
+            "attributes": {}
+          }
+        ],
+        "notes": "The room has a 'prison bed' and an 'in-progress inversion of a day bed'.",
+        "raw_response": "{\n  \"room\": \"bedroom\",\n  \"area\": \"bed area\",\n  \"container\": null,\n  \"items\": [\n    {\n      \"name\": \"bed\",\n      \"attributes\": {}\n    },\n    {\n      \"name\": \"cream bedsheets\",\n      \"attributes\": {}\n    },\n    {\n      \"name\": \"pillow\",\n      \"attributes\": {}\n    },\n    {\n      \"name\": \"gray decorative pillow\",\n      \"attributes\": {}\n    },\n    {\n      \"name\": \"lamp\",\n      \"attributes\": {}\n    },\n    {\n      \"name\": \"bedside table\",\n      \"attributes\": {}\n    }\n  ],\n  \"notes\": \"The room has a 'prison bed' and an 'in-progress inversion of a day bed'.\"\n}"
+      },
+      "score": {
+        "format_compliance": 1,
+        "room_accuracy": 1,
+        "item_recall": 1,
+        "item_precision": 1,
+        "practical_utility": 1,
+        "overall": 1,
+        "details": {
+          "missing_fields": [],
+          "room_match": "exact",
+          "items_found": [
+            "bed",
+            "bedside table"
+          ],
+          "items_missed": [],
+          "items_hallucinated": []
+        }
+      }
+    },
+    {
+      "photo_id": "photo-002",
+      "model_id": "gpt-4o-mini",
+      "prompt_id": "current",
+      "timestamp": "2026-01-26T20:57:31.038Z",
+      "latency_ms": 3122,
+      "tokens": {
+        "input_tokens": 3281,
+        "output_tokens": 117,
+        "image_tokens": 1
+      },
+      "cost_usd": 0.00120035,
+      "result": {
+        "room": "bedroom",
+        "area": null,
+        "container": null,
+        "items": [
+          {
+            "name": "bed",
+            "attributes": {
+              "size": "twin",
+              "style": "prison bed"
+            }
+          },
+          {
+            "name": "pillow",
+            "attributes": {
+              "color": "green"
+            }
+          },
+          {
+            "name": "bedside table",
+            "attributes": {}
+          },
+          {
+            "name": "humidifier",
+            "attributes": {}
+          },
+          {
+            "name": "stools",
+            "attributes": {
+              "status": "put together"
+            }
+          }
+        ],
+        "raw_response": "{\n  \"room\": \"bedroom\",\n  \"area\": null,\n  \"container\": null,\n  \"items\": [\n    {\"name\": \"bed\", \"attributes\": {\"size\": \"twin\", \"style\": \"prison bed\"}},\n    {\"name\": \"pillow\", \"attributes\": {\"color\": \"green\"}},\n    {\"name\": \"bedside table\", \"attributes\": {}},\n    {\"name\": \"humidifier\", \"attributes\": {}},\n    {\"name\": \"stools\", \"attributes\": {\"status\": \"put together\"}}\n  ]\n}"
+      },
+      "score": {
+        "format_compliance": 1,
+        "room_accuracy": 1,
+        "item_recall": 1,
+        "item_precision": 1,
+        "practical_utility": 0.75,
+        "overall": 0.9624999999999999,
+        "details": {
+          "missing_fields": [],
+          "room_match": "exact",
+          "items_found": [
+            "bed",
+            "bedside table"
+          ],
+          "items_missed": [],
+          "items_hallucinated": []
+        }
+      }
+    },
+    {
+      "photo_id": "photo-002",
+      "model_id": "gemini-flash",
+      "prompt_id": "current",
+      "timestamp": "2026-01-26T20:57:34.514Z",
+      "latency_ms": 2974,
+      "tokens": {
+        "input_tokens": 2274,
+        "output_tokens": 217
+      },
+      "cost_usd": 0.0003142,
+      "result": {
+        "room": "bedroom",
+        "area": "bedside",
+        "container": null,
+        "items": [
+          {
+            "name": "bed",
+            "attributes": {}
+          },
+          {
+            "name": "pillow",
+            "attributes": {}
+          },
+          {
+            "name": "bedside table",
+            "attributes": {}
+          },
+          {
+            "name": "lamp",
+            "attributes": {}
+          },
+          {
+            "name": "statue",
+            "attributes": {}
+          },
+          {
+            "name": "hat",
+            "attributes": {}
+          },
+          {
+            "name": "humidifier",
+            "attributes": {}
+          }
+        ],
+        "notes": "hat, humidifier, bedside table made up, stools put together, prison bed, an in-progress inversion of a day bed.",
+        "raw_response": "```json\n{\n  \"room\": \"bedroom\",\n  \"area\": \"bedside\",\n  \"container\": null,\n  \"items\": [\n    {\n      \"name\": \"bed\",\n      \"attributes\": {}\n    },\n    {\n      \"name\": \"pillow\",\n      \"attributes\": {}\n    },\n    {\n      \"name\": \"bedside table\",\n      \"attributes\": {}\n    },\n    {\n      \"name\": \"lamp\",\n      \"attributes\": {}\n    },\n    {\n      \"name\": \"statue\",\n      \"attributes\": {}\n    },\n    {\n      \"name\": \"hat\",\n      \"attributes\": {}\n    },\n    {\n      \"name\": \"humidifier\",\n      \"attributes\": {}\n    }\n  ],\n  \"notes\": \"hat, humidifier, bedside table made up, stools put together, prison bed, an in-progress inversion of a day bed.\"\n}\n```"
+      },
+      "score": {
+        "format_compliance": 1,
+        "room_accuracy": 1,
+        "item_recall": 1,
+        "item_precision": 1,
+        "practical_utility": 1,
+        "overall": 1,
+        "details": {
+          "missing_fields": [],
+          "room_match": "exact",
+          "items_found": [
+            "bed",
+            "bedside table"
+          ],
+          "items_missed": [],
+          "items_hallucinated": []
+        }
+      }
+    }
+  ],
+  "summary": {
+    "by_model": {
+      "gpt-4o": {
+        "avg_score": 0.8166666666666667,
+        "avg_latency_ms": 6384,
+        "avg_cost_usd": 0.0040575,
+        "total_cost_usd": 0.008115,
+        "runs": 2
+      },
+      "gpt-4o-mini": {
+        "avg_score": 0.9229166666666666,
+        "avg_latency_ms": 3118.5,
+        "avg_cost_usd": 0.00118715,
+        "total_cost_usd": 0.0023743,
+        "runs": 2
+      },
+      "gemini-flash": {
+        "avg_score": 0.9416666666666667,
+        "avg_latency_ms": 3031.5,
+        "avg_cost_usd": 0.0003078,
+        "total_cost_usd": 0.0006156,
+        "runs": 2
+      }
+    },
+    "by_prompt": {
+      "current": {
+        "avg_score": 0.8937499999999999,
+        "avg_latency_ms": 4178,
+        "runs": 6
+      }
+    },
+    "by_photo": {
+      "photo-001": {
+        "avg_score": 0.7999999999999999
+      },
+      "photo-002": {
+        "avg_score": 0.9874999999999999
+      }
+    },
+    "best_combination": {
+      "model": "gpt-4o",
+      "prompt": "current",
+      "score": 1
+    },
+    "total_cost_usd": 0.011104900000000001
+  }
+}

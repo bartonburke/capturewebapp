@@ -1,0 +1,139 @@
+{
+  "metadata": {
+    "run_id": "eval-1769459114497",
+    "started_at": "2026-01-26T20:25:14.497Z",
+    "completed_at": "2026-01-26T20:25:25.218Z",
+    "test_session": "eval-session-001",
+    "photos_tested": 1,
+    "models_tested": [
+      "gpt-4o",
+      "gemini-flash"
+    ],
+    "prompts_tested": [
+      "current"
+    ]
+  },
+  "results": [
+    {
+      "photo_id": "photo-001",
+      "model_id": "gpt-4o",
+      "prompt_id": "current",
+      "timestamp": "2026-01-26T20:25:21.185Z",
+      "latency_ms": 6546,
+      "result": {
+        "room": "bedroom",
+        "area": "floor near door",
+        "container": null,
+        "items": [
+          {
+            "name": "white day bed frame",
+            "attributes": {}
+          },
+          {
+            "name": "hat",
+            "attributes": {
+              "color": "beige"
+            }
+          },
+          {
+            "name": "painting of a dog",
+            "attributes": {}
+          },
+          {
+            "name": "cabinet",
+            "attributes": {
+              "color": "white"
+            }
+          }
+        ],
+        "raw_response": "```json\n{\n  \"room\": \"bedroom\",\n  \"area\": \"floor near door\",\n  \"container\": null,\n  \"items\": [\n    {\"name\": \"white day bed frame\", \"attributes\": {}},\n    {\"name\": \"hat\", \"attributes\": {\"color\": \"beige\"}},\n    {\"name\": \"painting of a dog\", \"attributes\": {}},\n    {\"name\": \"cabinet\", \"attributes\": {\"color\": \"white\"}}\n  ]\n}\n```"
+      },
+      "score": {
+        "format_compliance": 1,
+        "room_accuracy": 0,
+        "item_recall": 0.6666666666666666,
+        "item_precision": 1,
+        "practical_utility": 1,
+        "overall": 0.6333333333333333,
+        "details": {
+          "missing_fields": [],
+          "room_match": "wrong",
+          "items_found": [
+            "hat",
+            "painting"
+          ],
+          "items_missed": [
+            "couch"
+          ],
+          "items_hallucinated": []
+        }
+      }
+    },
+    {
+      "photo_id": "photo-001",
+      "model_id": "gemini-flash",
+      "prompt_id": "current",
+      "timestamp": "2026-01-26T20:25:24.718Z",
+      "latency_ms": 3026,
+      "result": {
+        "raw_response": "```json\n[\n  {\n    \"room\": \"living room\",\n    \"area\": \"near wall\",\n    \"container\": null,\n    \"items\": [\n      {\n        \"name\": \"painting of dog\",\n        \"attributes\": {}\n      },\n      {\n        \"name\": \"day bed\",\n        \"attributes\": {}\n      },\n      {\n        \"name\": \"hat\",\n        \"attributes\": {}\n      }\n    ],\n    \"notes\": \"We have a hat, ... an in-progress inversion of a day bed.\"\n  },\n  {\n    \"room\": \"living room\",\n    \"area\": \"by the wall\",\n    \"container\": \"cabinet\",\n    \"items\": [\n      {\n        \"name\": \"books\",\n        \"attributes\": {}\n      },\n      {\n        \"name\": \"tools\",\n        \"attributes\": {}\n      }\n    ],\n    \"notes\": null\n  }\n]\n```",
+        "error": "Failed to parse JSON"
+      },
+      "score": {
+        "format_compliance": 0,
+        "room_accuracy": 0,
+        "item_recall": 0,
+        "item_precision": 1,
+        "practical_utility": 0,
+        "overall": 0.1,
+        "details": {
+          "missing_fields": [
+            "room",
+            "area",
+            "container",
+            "items"
+          ],
+          "room_match": "wrong",
+          "items_found": [],
+          "items_missed": [
+            "couch",
+            "hat",
+            "painting"
+          ],
+          "items_hallucinated": []
+        }
+      }
+    }
+  ],
+  "summary": {
+    "by_model": {
+      "gpt-4o": {
+        "avg_score": 0.6333333333333333,
+        "avg_latency_ms": 6546,
+        "runs": 1
+      },
+      "gemini-flash": {
+        "avg_score": 0.1,
+        "avg_latency_ms": 3026,
+        "runs": 1
+      }
+    },
+    "by_prompt": {
+      "current": {
+        "avg_score": 0.36666666666666664,
+        "avg_latency_ms": 4786,
+        "runs": 2
+      }
+    },
+    "by_photo": {
+      "photo-001": {
+        "avg_score": 0.36666666666666664
+      }
+    },
+    "best_combination": {
+      "model": "gpt-4o",
+      "prompt": "current",
+      "score": 0.6333333333333333
+    }
+  }
+}

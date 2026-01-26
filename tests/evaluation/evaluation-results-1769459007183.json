@@ -1,0 +1,140 @@
+{
+  "metadata": {
+    "run_id": "eval-1769458995108",
+    "started_at": "2026-01-26T20:23:15.108Z",
+    "completed_at": "2026-01-26T20:23:27.183Z",
+    "test_session": "eval-session-001",
+    "photos_tested": 1,
+    "models_tested": [
+      "claude-sonnet",
+      "gpt-4o"
+    ],
+    "prompts_tested": [
+      "current"
+    ]
+  },
+  "results": [
+    {
+      "photo_id": "photo-001",
+      "model_id": "claude-sonnet",
+      "prompt_id": "current",
+      "timestamp": "2026-01-26T20:23:15.761Z",
+      "latency_ms": 573,
+      "result": {
+        "error": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.\"},\"request_id\":\"req_011CXWcZMAt5vqUUb8F89UYo\"}"
+      },
+      "score": {
+        "format_compliance": 0,
+        "room_accuracy": 0,
+        "item_recall": 0,
+        "item_precision": 1,
+        "practical_utility": 0,
+        "overall": 0.1,
+        "details": {
+          "missing_fields": [
+            "room",
+            "area",
+            "container",
+            "items"
+          ],
+          "room_match": "wrong",
+          "items_found": [],
+          "items_missed": [
+            "couch",
+            "hat",
+            "painting"
+          ],
+          "items_hallucinated": []
+        }
+      }
+    },
+    {
+      "photo_id": "photo-001",
+      "model_id": "gpt-4o",
+      "prompt_id": "current",
+      "timestamp": "2026-01-26T20:23:26.682Z",
+      "latency_ms": 10253,
+      "result": {
+        "room": "living room",
+        "area": "floor",
+        "container": null,
+        "items": [
+          {
+            "name": "white sofa",
+            "attributes": {
+              "status": "inverted"
+            }
+          },
+          {
+            "name": "painting",
+            "attributes": {
+              "subject": "dog"
+            }
+          },
+          {
+            "name": "hat",
+            "attributes": {
+              "color": "beige"
+            }
+          },
+          {
+            "name": "cabinet",
+            "attributes": {}
+          }
+        ],
+        "raw_response": "{\n  \"room\": \"living room\",\n  \"area\": \"floor\",\n  \"container\": null,\n  \"items\": [\n    {\n      \"name\": \"white sofa\",\n      \"attributes\": {\n        \"status\": \"inverted\"\n      }\n    },\n    {\n      \"name\": \"painting\",\n      \"attributes\": {\n        \"subject\": \"dog\"\n      }\n    },\n    {\n      \"name\": \"hat\",\n      \"attributes\": {\n        \"color\": \"beige\"\n      }\n    },\n    {\n      \"name\": \"cabinet\",\n      \"attributes\": {}\n    }\n  ]\n}"
+      },
+      "score": {
+        "format_compliance": 1,
+        "room_accuracy": 1,
+        "item_recall": 0.6666666666666666,
+        "item_precision": 1,
+        "practical_utility": 1,
+        "overall": 0.8833333333333333,
+        "details": {
+          "missing_fields": [],
+          "room_match": "exact",
+          "items_found": [
+            "hat",
+            "painting"
+          ],
+          "items_missed": [
+            "couch"
+          ],
+          "items_hallucinated": []
+        }
+      }
+    }
+  ],
+  "summary": {
+    "by_model": {
+      "claude-sonnet": {
+        "avg_score": 0.1,
+        "avg_latency_ms": 573,
+        "runs": 1
+      },
+      "gpt-4o": {
+        "avg_score": 0.8833333333333333,
+        "avg_latency_ms": 10253,
+        "runs": 1
+      }
+    },
+    "by_prompt": {
+      "current": {
+        "avg_score": 0.49166666666666664,
+        "avg_latency_ms": 5413,
+        "runs": 2
+      }
+    },
+    "by_photo": {
+      "photo-001": {
+        "avg_score": 0.49166666666666664
+      }
+    },
+    "best_combination": {
+      "model": "gpt-4o",
+      "prompt": "current",
+      "score": 0.8833333333333333
+    }
+  }
+}
