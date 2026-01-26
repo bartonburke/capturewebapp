@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Project, PhotoMetadata, AudioMetadata, ProcessingResult, Transcript, TranscriptSegment, PhotoAnalysis, ProcessingProgress } from '../../lib/types';
+import { Project, PhotoMetadata, AudioMetadata, ProcessingResult, Transcript, TranscriptSegment, PhotoAnalysis, ProcessingProgress, SessionSynthesis } from '../../lib/types';
 import { getProject, getProjectPhotos, getProjectAudio, deletePhoto, deleteAudio, updateProject, deleteProject, deleteLaunchSession, saveProcessingResult, getSessionProcessingResult, savePhoto } from '../../lib/db';
 import { downloadBlob, exportPortableEvidencePackage, generatePortableFilename } from '../../lib/export';
 import { findMatchingSegment } from '../../lib/correlation';
@@ -348,7 +348,45 @@ export default function ProjectDetailsPage() {
         // Continue - sync failure shouldn't block processing completion
       }
 
-      setProcessingProgress({ step: 'syncing', progress: 100, message: 'Processing complete!' });
+      // Step 5: Session Synthesis (for home-inventory and other supported types)
+      if (project.projectType === 'home-inventory') {
+        setProcessingProgress({ step: 'synthesizing', progress: 98, message: 'Synthesizing inventory...' });
+        console.log('[ProcessSession] Starting synthesis...');
+
+        try {
+          const synthesizeResponse = await fetch('/api/synthesize-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sessionId,
+              projectId: project.id,
+              projectType: project.projectType,
+              photoAnalyses,
+              transcript: finalTranscript,
+            }),
+          });
+
+          if (synthesizeResponse.ok) {
+            const synthesizeResult = await synthesizeResponse.json();
+            if (synthesizeResult.success && synthesizeResult.synthesis) {
+              console.log(`[ProcessSession] Synthesis complete: ${synthesizeResult.synthesis.deliverables.length} deliverables`);
+
+              // Update result with synthesis
+              result.synthesis = synthesizeResult.synthesis;
+              await saveProcessingResult(result);
+              setProcessingResult(result);
+            }
+          } else {
+            console.warn('[ProcessSession] Synthesis failed:', await synthesizeResponse.text());
+            // Non-critical - continue without synthesis
+          }
+        } catch (synthError) {
+          console.warn('[ProcessSession] Synthesis error (non-critical):', synthError);
+          // Continue - synthesis failure shouldn't block processing completion
+        }
+      }
+
+      setProcessingProgress({ step: 'synthesizing', progress: 100, message: 'Processing complete!' });
       console.log('[ProcessSession] Complete!');
 
     } catch (error: any) {
@@ -653,6 +691,19 @@ export default function ProjectDetailsPage() {
 
       {/* Scrollable Content */}
       <div className="max-w-4xl mx-auto px-4 py-6 pb-24">
+        {/* Add to Inventory Button - Primary CTA for home-inventory projects */}
+        {project.projectType === 'home-inventory' && (
+          <button
+            onClick={() => router.push(`/capture/${projectId}`)}
+            className="w-full mb-6 py-4 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white font-bold text-lg rounded-xl shadow-lg transition-all flex items-center justify-center gap-3"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+            Add to Inventory
+          </button>
+        )}
+
         {/* Audio Section */}
         {audio.length > 0 && (
           <section className="mb-8">
@@ -731,21 +782,53 @@ export default function ProjectDetailsPage() {
               <p className="mt-2 text-red-400 text-sm text-center">{processingError}</p>
             )}
 
-            {/* Transcript Display */}
-            {processingResult?.transcript && (
-              <div className="mt-4 bg-gray-800 rounded-lg p-4 border border-gray-700">
-                <h3 className="text-white font-medium mb-2 flex items-center gap-2">
-                  <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  Transcript
-                </h3>
-                <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap">
-                  {processingResult.transcript.fullText}
-                </p>
-                {processingResult.transcript.language && (
-                  <p className="text-gray-500 text-xs mt-2">
-                    Language: {processingResult.transcript.language} • Duration: {formatDuration(processingResult.transcript.duration)}
+          </section>
+        )}
+
+        {/* Synthesis Deliverables Section - Home Inventory */}
+        {processingResult?.synthesis && processingResult.synthesis.deliverables.length > 0 && (
+          <section className="mb-8">
+            <h2 className="text-white font-semibold text-lg mb-4 flex items-center gap-2">
+              <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+              </svg>
+              Inventory Summary
+            </h2>
+            <div className="space-y-4">
+              {processingResult.synthesis.deliverables.map((deliverable) => (
+                <details
+                  key={deliverable.id}
+                  className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden"
+                >
+                  <summary className="px-4 py-3 cursor-pointer hover:bg-gray-750 flex items-center justify-between">
+                    <span className="text-white font-medium">{deliverable.title}</span>
+                    <svg className="w-5 h-5 text-gray-400 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </summary>
+                  <div className="px-4 py-3 border-t border-gray-700">
+                    <div className="prose prose-invert prose-sm max-w-none">
+                      <pre className="whitespace-pre-wrap text-gray-300 text-sm font-sans leading-relaxed bg-transparent p-0 m-0">
+                        {deliverable.content}
+                      </pre>
+                    </div>
+                  </div>
+                </details>
+              ))}
+            </div>
+
+            {/* Coverage Score */}
+            {processingResult.synthesis.coverageAnalysis && (
+              <div className="mt-4 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-400 text-sm">Coverage</span>
+                  <span className="text-white font-medium">
+                    {Math.round(processingResult.synthesis.coverageAnalysis.completenessScore * 100)}%
+                  </span>
+                </div>
+                {processingResult.synthesis.coverageAnalysis.missingLocations.length > 0 && (
+                  <p className="text-yellow-400 text-xs mt-1">
+                    Missing: {processingResult.synthesis.coverageAnalysis.missingLocations.join(', ')}
                   </p>
                 )}
               </div>
@@ -791,7 +874,7 @@ export default function ProjectDetailsPage() {
                 )}
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-2">
               {photos.map((photo) => (
                 <button
                   key={photo.id}
@@ -874,6 +957,35 @@ export default function ProjectDetailsPage() {
             </div>
           </section>
         )}
+
+        {/* Transcript Section - At Bottom */}
+        {processingResult?.transcript && processingResult.transcript.fullText && (
+          <section className="mt-8 pb-6">
+            <details className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+              <summary className="px-4 py-3 cursor-pointer hover:bg-gray-750 flex items-center justify-between">
+                <span className="text-white font-medium flex items-center gap-2">
+                  <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Transcript
+                  {processingResult.transcript.language && (
+                    <span className="text-gray-500 text-xs ml-2">
+                      ({processingResult.transcript.language} • {formatDuration(processingResult.transcript.duration)})
+                    </span>
+                  )}
+                </span>
+                <svg className="w-5 h-5 text-gray-400 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </summary>
+              <div className="px-4 py-3 border-t border-gray-700">
+                <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap">
+                  {processingResult.transcript.fullText}
+                </p>
+              </div>
+            </details>
+          </section>
+        )}
       </div>
 
       {/* Processing Progress Modal */}
@@ -915,8 +1027,11 @@ export default function ProjectDetailsPage() {
               <div className={`flex items-center gap-2 ${processingProgress.step === 'analyzing_photos' ? 'text-purple-400' : processingProgress.progress > 90 ? 'text-green-400' : 'text-gray-500'}`}>
                 {processingProgress.progress > 90 ? '✓' : processingProgress.step === 'analyzing_photos' ? '○' : '○'} Analyzing photos {processingProgress.currentItem && processingProgress.totalItems ? `(${processingProgress.currentItem}/${processingProgress.totalItems})` : ''}
               </div>
-              <div className={`flex items-center gap-2 ${processingProgress.step === 'saving' ? 'text-purple-400' : processingProgress.progress >= 100 ? 'text-green-400' : 'text-gray-500'}`}>
-                {processingProgress.progress >= 100 ? '✓' : processingProgress.step === 'saving' ? '○' : '○'} Saving results
+              <div className={`flex items-center gap-2 ${processingProgress.step === 'syncing' ? 'text-purple-400' : processingProgress.progress > 96 ? 'text-green-400' : 'text-gray-500'}`}>
+                {processingProgress.progress > 96 ? '✓' : processingProgress.step === 'syncing' ? '○' : '○'} Syncing to graph
+              </div>
+              <div className={`flex items-center gap-2 ${processingProgress.step === 'synthesizing' ? 'text-purple-400' : processingProgress.progress >= 100 ? 'text-green-400' : 'text-gray-500'}`}>
+                {processingProgress.progress >= 100 ? '✓' : processingProgress.step === 'synthesizing' ? '○' : '○'} Building inventory
               </div>
             </div>
           </div>

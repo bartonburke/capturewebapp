@@ -195,7 +195,105 @@ export interface ProcessingResult {
   transcript: Transcript;
   photoAnalyses: PhotoAnalysis[];
   entities: ExtractedEntity[];
+  synthesis?: SessionSynthesis;  // Phase 5: cross-photo synthesis
 }
+
+// ============================================================================
+// Session Synthesis Types (Phase 5)
+// ============================================================================
+
+// Session synthesis result - produced after all photos analyzed
+export interface SessionSynthesis {
+  id: string;
+  sessionId: string;
+  createdAt: string;
+  projectType: ProjectType;
+
+  // Cross-photo intelligence
+  entityClusters: EntityCluster[];      // Deduplicated entities across photos
+  locationHierarchy: LocationNode[];    // Room → area → container → spot tree
+  searchIndex: SearchIndexEntry[];      // Fast lookup terms
+  coverageAnalysis: CoverageAnalysis;   // Missing areas detection
+
+  // Project-type-specific deliverables
+  deliverables: SynthesisDeliverable[];
+
+  // Metadata
+  llmModel?: string;
+  graphQueriesExecuted?: string[];
+  synthesisMethod: 'graph' | 'indexeddb';  // Which data source was used
+}
+
+// Entity clusters - same item appearing across multiple photos
+export interface EntityCluster {
+  clusterId: string;
+  canonicalName: string;        // Unified name for the entity
+  entityType: string;           // item, location, container, etc.
+  photoIds: string[];           // All photos showing this entity
+  descriptions: string[];       // All descriptions from each photo
+  mergedDescription: string;    // LLM-synthesized unified description
+  locations: string[];          // All locations where this entity appears
+  confidence: number;           // 0-1 clustering confidence
+}
+
+// Location hierarchy node
+export interface LocationNode {
+  id: string;
+  name: string;
+  level: 'room' | 'area' | 'container' | 'shelf' | 'spot' | 'other';
+  parentId?: string;            // For tree structure
+  children?: LocationNode[];    // Child nodes (built at runtime)
+  photoIds: string[];           // Photos taken at this location
+  itemCount: number;            // Number of items at this location
+}
+
+// Search index entry for fast lookup
+export interface SearchIndexEntry {
+  term: string;                 // Search term (item name, category, etc.)
+  type: 'item' | 'location' | 'category' | 'tag' | 'container';
+  matches: SearchMatch[];
+}
+
+export interface SearchMatch {
+  photoId: string;
+  entityId?: string;
+  clusterId?: string;
+  relevance: number;            // 0-1 relevance score
+  context?: string;             // Snippet showing match context
+}
+
+// Coverage analysis - what's missing
+export interface CoverageAnalysis {
+  mentionedLocations: string[];     // Locations mentioned in transcript
+  photographedLocations: string[];  // Locations with photos
+  missingLocations: string[];       // Mentioned but not photographed
+  suggestedFollowups: string[];     // What to capture next
+  completenessScore: number;        // 0-1 overall coverage
+}
+
+// Generic deliverable wrapper
+export interface SynthesisDeliverable {
+  id: string;
+  type: SynthesisDeliverableType;
+  title: string;
+  format: 'markdown' | 'json' | 'html';
+  content: string;              // The actual deliverable content
+  generatedAt: string;          // ISO8601
+  metadata?: Record<string, unknown>;
+}
+
+// Deliverable types per project type
+export type SynthesisDeliverableType =
+  // Home inventory deliverables
+  | 'room-inventory'            // Items organized by room
+  | 'item-index'                // Alphabetical item list with locations
+  | 'storage-map'               // What's in each container
+  | 'cross-references'          // Items in multiple places
+  | 'coverage-report'           // Missing areas
+  // Future: other project types
+  | 'findings-summary'          // For ESA/EIR
+  | 'site-observations'
+  | 'recommendations';
 
 // Progress tracking for UI
 export type ProcessingStep =
@@ -205,7 +303,8 @@ export type ProcessingStep =
   | 'correlating'
   | 'extracting_entities'
   | 'saving'
-  | 'syncing';  // Syncing to Neo4j graph
+  | 'syncing'              // Syncing to Neo4j graph
+  | 'synthesizing';        // Phase 5: cross-photo synthesis
 
 export interface ProcessingProgress {
   step: ProcessingStep;
