@@ -410,7 +410,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<IngestRespons
     // Branch based on project type
     if (projectType === 'home-inventory') {
       // Use home inventory specific processing
-      const homePhotos = (indexJson.photos || body.photos) as HomeInventoryPhoto[];
+      const homePhotos = (body.photos || indexJson.photos) as unknown as HomeInventoryPhoto[];
       const processed = processHomeInventory(homePhotos, sessionId);
 
       console.log(`[GraphIngest] Home inventory prepared: ${processed.photoNodes.length} photos, ${processed.entityNodes.length} entities, ${processed.locationNodes.length} locations`);
