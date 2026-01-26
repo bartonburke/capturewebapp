@@ -1,7 +1,7 @@
 /**
  * Test script for home inventory graph queries
  *
- * Run with: npx ts-node tests/test-home-inventory-queries.ts
+ * Run with: npx ts-node --esm tests/test-home-inventory-queries.ts
  *
  * Prerequisites:
  * 1. Neo4j is running and accessible

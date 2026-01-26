@@ -1,11 +1,15 @@
 /**
  * Script to ingest the home inventory test fixture into Neo4j
  *
- * Run with: npx ts-node tests/ingest-test-fixture.ts
+ * Run with: npx ts-node --esm tests/ingest-test-fixture.ts
  */
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 async function ingestTestFixture() {
   // Load test fixture
