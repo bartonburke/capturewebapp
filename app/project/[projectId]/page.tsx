@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Project, PhotoMetadata, AudioMetadata, ProcessingResult, Transcript, TranscriptSegment, PhotoAnalysis, ProcessingProgress, SessionSynthesis } from '../../lib/types';
-import { getProject, getProjectPhotos, getProjectAudio, deletePhoto, deleteAudio, updateProject, deleteProject, deleteLaunchSession, saveProcessingResult, getSessionProcessingResult, savePhoto } from '../../lib/db';
+import { getProject, getProjectPhotos, getProjectAudio, deletePhoto, deleteAudio, updateProject, deleteProject, deleteLaunchSession, saveProcessingResult, updateProcessingResult, getSessionProcessingResult, savePhoto } from '../../lib/db';
 import { downloadBlob, exportPortableEvidencePackage, generatePortableFilename, exportProcessedSession, generateProcessedFilename } from '../../lib/export';
 import { findMatchingSegment } from '../../lib/correlation';
 import { extractExifData, fileToBase64 } from '../../lib/exif';
@@ -91,7 +91,14 @@ export default function ProjectDetailsPage() {
     const checkExistingResults = async () => {
       if (audio.length > 0) {
         const sessionId = audio[0].sessionId;
+        console.log('[ProjectPage] Checking for existing results, sessionId:', sessionId);
         const existingResult = await getSessionProcessingResult(sessionId);
+        console.log('[ProjectPage] Loaded result:', existingResult ? {
+          id: existingResult.id,
+          status: existingResult.status,
+          hasSynthesis: !!existingResult.synthesis,
+          synthesisDeliverables: existingResult.synthesis?.deliverables?.length ?? 0,
+        } : 'null');
         if (existingResult && existingResult.status === 'completed') {
           setProcessingResult(existingResult);
         }
@@ -371,10 +378,32 @@ export default function ProjectDetailsPage() {
             if (synthesizeResult.success && synthesizeResult.synthesis) {
               console.log(`[ProcessSession] Synthesis complete: ${synthesizeResult.synthesis.deliverables.length} deliverables`);
 
-              // Update result with synthesis
+              // Update result with synthesis (use updateProcessingResult since record already exists)
               result.synthesis = synthesizeResult.synthesis;
-              await saveProcessingResult(result);
+              await updateProcessingResult(result);
               setProcessingResult(result);
+              console.log('[ProcessSession] Synthesis saved successfully');
+
+              // Step 5b: Sync inventory items to Neo4j graph
+              console.log('[ProcessSession] Syncing inventory to graph...');
+              try {
+                const inventorySyncResponse = await fetch('/api/graph/sync-inventory', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    sessionId,
+                    synthesis: synthesizeResult.synthesis,
+                  }),
+                });
+                if (inventorySyncResponse.ok) {
+                  const inventorySyncResult = await inventorySyncResponse.json();
+                  console.log(`[ProcessSession] Inventory synced: ${inventorySyncResult.nodesCreated.items} items, ${inventorySyncResult.nodesCreated.locations} locations`);
+                } else {
+                  console.warn('[ProcessSession] Inventory sync failed:', await inventorySyncResponse.text());
+                }
+              } catch (inventorySyncError) {
+                console.warn('[ProcessSession] Inventory sync error (non-critical):', inventorySyncError);
+              }
             }
           } else {
             console.warn('[ProcessSession] Synthesis failed:', await synthesizeResponse.text());
