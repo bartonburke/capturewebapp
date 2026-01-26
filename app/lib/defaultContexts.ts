@@ -393,85 +393,41 @@ Provide specific observations for inventory documentation.`;
 const genericVisionPrompt = `Analyze this photo and describe the site conditions,
 notable features, and any observations relevant to environmental or engineering assessment.`;
 
-const homeInventoryVisionPrompt = `You are helping build a searchable home inventory. The goal is simple: help someone find things later.
+const homeInventoryVisionPrompt = `You are cataloging items in a home to help find things later.
 
-## YOUR JOB
-1. Identify WHAT is in the photo (plain language, not technical)
-2. Note WHERE it is (be specific: room, area, shelf, drawer, container)
-3. Describe HOW to find it (visual landmarks, what's nearby)
-4. Extract any verbal context about location or organization
+For each photo, extract:
+1. **room** - Which room is this? (kitchen, bedroom, garage, etc.) Use lowercase.
+2. **area** - Where in the room? (counter, closet, by the window, etc.)
+3. **container** - What holds the items? (drawer, shelf, bin, cabinet, etc.) Null if items aren't in a container.
+4. **items** - List of things visible. Use plain language names.
+5. **notes** - Any verbal context from the transcript worth remembering.
 
-## DESCRIPTION GUIDELINES
-Write like you're telling someone where to find something:
-- "Blue KitchenAid stand mixer on the counter next to the stove"
-- "Holiday decorations in the large plastic bin, top shelf of garage shelving"
-- "Spare phone chargers in the junk drawer, kitchen island"
+## ITEM EXTRACTION RULES
+- List each distinct item you can see
+- Use common names: "hammer" not "ball-peen hammer with fiberglass handle"
+- Include color/size only if helpful for finding: "red toolbox", "large plastic bin"
+- Group similar items: "assorted screwdrivers" not individual listings
+- If transcript mentions items, include those too
 
-Be specific enough that someone unfamiliar with the house could find it.
+## EXAMPLES
 
-## LOCATION HIERARCHY
-Always try to capture:
-1. **Room**: kitchen, master bedroom, garage, basement, etc.
-2. **Area**: pantry, closet, under sink, by the window, etc.
-3. **Spot**: top shelf, left drawer, in the blue bin, behind the coats, etc.
+Photo of kitchen counter with appliances:
+- room: "kitchen"
+- area: "counter, left of stove"
+- container: null
+- items: ["red stand mixer", "toaster", "knife block"]
 
-## WHAT TO CAPTURE
-- Item name (common name, not model numbers)
-- Category (tools, kitchen, electronics, seasonal, etc.)
-- Color/size if helpful for finding
-- Container or storage (box, bin, drawer, shelf)
-- Quantity if multiple items
-- Any verbal notes from the person ("this is where we keep...")
+Photo of garage shelving with bins:
+- room: "garage"
+- area: "metal shelving unit, back wall"
+- container: "large clear plastic bin, top shelf"
+- items: ["christmas lights", "ornaments", "tree stand"]
 
-## WHAT TO SKIP
-- Serial numbers, model numbers, specs (unless specifically asked)
-- Insurance/replacement value
-- Technical specifications
-- Compliance markings
-- **Common low-value items** unless specifically mentioned in voice note:
-  - Basic kitchenware (utensils, plates, glasses, pots, pans)
-  - Standard toiletries and cleaning supplies
-  - Basic office supplies (pens, paper, tape)
-  - Everyday clothing items
-  - Generic decorative items
-
-**EXCEPTION**: If the person mentions it ("this is where we keep the good knives"
-or "my grandmother's dishes"), then it's worth documenting.
-
-## SIGNAL WORDS THAT MAKE COMMON ITEMS WORTH NOTING
-- "good" / "nice" / "expensive" / "special"
-- "grandmother's" / "inherited" / "antique" / "vintage"
-- "collection" / "set" / "complete"
-- "hard to find" / "discontinued" / "custom"
-- "this is where we keep..."
-- Any named brand mentioned with intent
-
-## MULTIPLE ITEMS IN ONE PHOTO
-
-**Default behavior**: Describe the collection/storage, note notable items only
-- "Junk drawer in kitchen island - batteries, tape, scissors, misc"
-- "Bookshelf in office, mostly paperbacks and reference books"
-
-**When to itemize everything visible**:
-The voice note signals inventory intent with phrases like:
-- "here is the..." / "this drawer has..." / "this is where I keep..."
-- "all of my..." / "my collection of..."
-- "let me show you what's in here"
-- Listing items aloud as they photograph
-
-**Example**:
-Voice: "Here's the upper tool drawer"
-→ Output: "Upper tool drawer, kitchen" (summary)
-
-Voice: "Here's the upper tool drawer which has all of these tools"
-→ Output: Itemize what's visible (hammer, screwdrivers, tape measure, etc.)
-
-**Itemization format**:
-When itemizing, list items clearly in the description:
-"Upper tool drawer (left of stove): hammer, Phillips screwdriver set,
-tape measure, Allen keys, adjustable wrench, utility knife, small level"
-
-Create individual entities only for notable/valuable items. Group the rest in description.`;
+Photo of bedroom closet:
+- room: "bedroom"
+- area: "closet"
+- container: "top shelf"
+- items: ["winter blankets", "luggage set"]`;
 
 const travelLogVisionPrompt = `Analyze this travel photo and describe:
 - Location or landmark identification if recognizable

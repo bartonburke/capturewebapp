@@ -26,10 +26,11 @@ export interface PhotoNode {
  */
 export interface EntityNode {
   id: string;                    // {sessionId}-photo-{i}-entity-{j}
-  entityType: string;            // REC | AOC | Feature | Condition | Observation
+  entityType: string;            // REC | AOC | Feature | Condition | Observation | item | note
   description: string;           // Full description from vision analysis
   severity: 'high' | 'medium' | 'low' | 'info';
   sessionId: string;             // Parent session ID
+  attributes?: string;           // Optional attributes for home inventory items (e.g., "color: red, quantity: 3")
 }
 
 /**
@@ -50,6 +51,7 @@ export interface IngestResponse {
   nodesCreated: {
     photos: number;
     entities: number;
+    locations?: number;  // Home inventory adds Location nodes
   };
   relationshipsCreated: number;
   errors?: string[];
