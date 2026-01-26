@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80" fill="none">
+  <rect width="80" height="80" fill="#374151"/>
+  <pattern id="diagonalStripes" patternUnits="userSpaceOnUse" width="8" height="8">
+    <path d="M-2,2 l4,-4 M0,8 l8,-8 M6,10 l4,-4" stroke="#4B5563" stroke-width="1"/>
+  </pattern>
+  <rect width="80" height="80" fill="url(#diagonalStripes)"/>
+  <path d="M28 32L36 42L40 38L52 52H28V32Z" fill="#6B7280"/>
+  <circle cx="48" cy="32" r="4" fill="#6B7280"/>
+  <rect x="24" y="24" width="32" height="32" rx="2" stroke="#6B7280" stroke-width="2" fill="none"/>
+</svg>

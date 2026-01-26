@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Project, PhotoMetadata, AudioMetadata, ProcessingResult, Transcript, TranscriptSegment, PhotoAnalysis, ProcessingProgress, SessionSynthesis } from '../../lib/types';
-import { getProject, getProjectPhotos, getProjectAudio, deletePhoto, deleteAudio, updateProject, deleteProject, deleteLaunchSession, saveProcessingResult, updateProcessingResult, getSessionProcessingResult, savePhoto } from '../../lib/db';
+import { getProject, getProjectPhotos, getProjectAudio, deletePhoto, deleteAudio, updateProject, deleteProject, deleteLaunchSession, saveProcessingResult, updateProcessingResult, getSessionProcessingResult, getProjectProcessingResults, deleteProcessingResult, savePhoto } from '../../lib/db';
 import { downloadBlob, exportPortableEvidencePackage, generatePortableFilename, exportProcessedSession, generateProcessedFilename } from '../../lib/export';
 import { findMatchingSegment } from '../../lib/correlation';
 import { extractExifData, fileToBase64 } from '../../lib/exif';
@@ -274,6 +274,17 @@ export default function ProjectDetailsPage() {
         segments: [],
         duration: 0
       };
+
+      // Delete any existing processing results for this session before saving new one
+      // This prevents duplicate records causing lookup issues
+      const existingResults = await getProjectProcessingResults(project.id);
+      const oldSessionResults = existingResults.filter(r => r.sessionId === sessionId);
+      if (oldSessionResults.length > 0) {
+        console.log(`[ProcessSession] Deleting ${oldSessionResults.length} old processing results for session ${sessionId}`);
+        for (const old of oldSessionResults) {
+          await deleteProcessingResult(old.id);
+        }
+      }
 
       const result: ProcessingResult = {
         id: crypto.randomUUID(),

@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, Suspense, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import MapPlaceholder from '../components/MapPlaceholder';
+import SearchResultCard from '../components/SearchResultCard';
 
 interface SearchResult {
   photo: {
@@ -45,6 +47,7 @@ function GraphSearchContent() {
   const [loading, setLoading] = useState(false);
   const [response, setResponse] = useState<SearchResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showCypher, setShowCypher] = useState(false);
 
   const handleSearch = async (searchQuery: string) => {
     if (!searchQuery.trim()) return;
@@ -81,246 +84,219 @@ function GraphSearchContent() {
     handleSearch(query);
   };
 
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case 'high':
-        return 'bg-red-100 text-red-800 border-red-200';
-      case 'medium':
-        return 'bg-orange-100 text-orange-800 border-orange-200';
-      case 'low':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
-
-  const getRecPotentialColor = (recPotential: string) => {
-    switch (recPotential) {
-      case 'high':
-        return 'text-red-600';
-      case 'medium':
-        return 'text-orange-600';
-      case 'low':
-        return 'text-green-600';
-      default:
-        return 'text-gray-600';
-    }
-  };
+  // Count photos with GPS data
+  const gpsStats = useMemo(() => {
+    if (!response) return { total: 0, withGps: 0 };
+    const total = response.results.length;
+    const withGps = response.results.filter((r) => r.photo.location !== null).length;
+    return { total, withGps };
+  }, [response]);
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 overflow-auto" style={{ position: 'relative' }}>
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-xl font-semibold text-gray-900">
-                {sessionId ? 'Project Search' : 'Graph Search'}
-              </h1>
-              <p className="text-sm text-gray-500">
-                {sessionId
-                  ? `Searching within session ${sessionId.slice(0, 8)}...`
-                  : 'Natural language search over photo graph'}
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              {sessionId && (
-                <Link
-                  href="/graph"
-                  className="text-sm text-purple-600 hover:text-purple-800"
-                >
-                  All Photos
-                </Link>
-              )}
-              <Link
-                href="/"
-                className="text-sm text-blue-600 hover:text-blue-800"
-              >
-                Back to Projects
-              </Link>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-6xl mx-auto px-4 py-6">
-        {/* Search Form */}
-        <form onSubmit={handleSubmit} className="mb-6">
-          <div className="flex gap-3">
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Ask a question about your photos..."
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg"
-              disabled={loading}
-            />
-            <button
-              type="submit"
-              disabled={loading || !query.trim()}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Searching...' : 'Search'}
-            </button>
-          </div>
-        </form>
-
-        {/* Example Queries */}
-        <div className="mb-8">
-          <p className="text-sm text-gray-500 mb-2">Try these examples:</p>
-          <div className="flex flex-wrap gap-2">
-            {EXAMPLE_QUERIES.map((example) => (
-              <button
-                key={example}
-                onClick={() => handleSearch(example)}
-                disabled={loading}
-                className="px-3 py-1.5 text-sm text-gray-700 bg-white border border-gray-200 rounded-full hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50"
-              >
-                {example}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Error */}
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-            {error}
-          </div>
-        )}
-
-        {/* Results */}
-        {response && (
+    <div className="h-screen flex flex-col bg-gray-900 text-white overflow-hidden">
+      {/* Header - compact */}
+      <header className="flex-shrink-0 bg-gray-900 border-b border-gray-800 px-4 py-3">
+        <div className="flex items-center justify-between mb-3">
           <div>
-            {/* Stats */}
-            <div className="mb-4 flex items-center justify-between">
-              <p className="text-sm text-gray-600">
-                Found <span className="font-semibold">{response.results.length}</span> photos in{' '}
-                <span className="font-semibold">{response.executionTimeMs}ms</span>
+            <h1 className="text-lg font-semibold">
+              {sessionId ? 'Project Search' : 'Graph Search'}
+            </h1>
+            {sessionId && (
+              <p className="text-xs text-gray-500">
+                Session {sessionId.slice(0, 8)}...
               </p>
-            </div>
-
-            {/* Cypher Query */}
-            <div className="mb-6 p-3 bg-gray-800 text-gray-100 rounded-lg font-mono text-sm overflow-x-auto">
-              <span className="text-gray-400">Generated Cypher: </span>
-              {response.cypherQuery}
-            </div>
-
-            {/* Photo Grid */}
-            {response.results.length === 0 ? (
-              <div className="text-center py-12 text-gray-500">
-                No photos found matching your query
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {response.results.map((result) => (
-                  <div
-                    key={result.photo.id}
-                    className="bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow"
-                  >
-                    {/* Photo placeholder (actual images would need to be served) */}
-                    <div className="aspect-video bg-gray-200 flex items-center justify-center">
-                      <div className="text-center p-4">
-                        <svg
-                          className="w-12 h-12 text-gray-400 mx-auto mb-2"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={1.5}
-                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                          />
-                        </svg>
-                        <p className="text-xs text-gray-500 break-all">
-                          {result.photo.id.split('-').slice(-1)[0]}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="p-4">
-                      {/* REC Potential Badge */}
-                      <div className="flex items-center justify-between mb-2">
-                        <span
-                          className={`text-xs font-medium ${getRecPotentialColor(
-                            result.photo.recPotential
-                          )}`}
-                        >
-                          REC: {result.photo.recPotential}
-                        </span>
-                        {result.photo.location && (
-                          <span className="text-xs text-gray-400">
-                            {result.photo.location.latitude.toFixed(4)},{' '}
-                            {result.photo.location.longitude.toFixed(4)}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Description */}
-                      <p className="text-sm text-gray-700 line-clamp-3 mb-3">
-                        {result.photo.vlmDescription}
-                      </p>
-
-                      {/* Entities */}
-                      {result.entities.length > 0 && (
-                        <div className="space-y-2">
-                          {result.entities.map((entity, idx) => (
-                            <div
-                              key={idx}
-                              className={`px-2 py-1 rounded border text-xs ${getSeverityColor(
-                                entity.severity
-                              )}`}
-                            >
-                              <span className="font-medium">{entity.entityType}</span>
-                              <span className="text-gray-500 ml-1">({entity.severity})</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
             )}
           </div>
-        )}
-
-        {/* Empty State */}
-        {!response && !error && !loading && (
-          <div className="text-center py-16">
-            <svg
-              className="w-16 h-16 text-gray-300 mx-auto mb-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+          <div className="flex items-center gap-3">
+            {sessionId && (
+              <Link
+                href="/graph"
+                className="text-sm text-purple-400 hover:text-purple-300"
+              >
+                All Photos
+              </Link>
+            )}
+            <Link
+              href="/"
+              className="text-sm text-blue-400 hover:text-blue-300"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-            <h2 className="text-xl font-medium text-gray-600 mb-2">Search your photo graph</h2>
-            <p className="text-gray-500">
-              Ask questions in natural language to find relevant photos and entities
-            </p>
+              Projects
+            </Link>
           </div>
-        )}
-      </main>
+        </div>
+
+        {/* Search Form */}
+        <form onSubmit={handleSubmit} className="flex gap-2">
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Ask a question about your photos..."
+            className="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+            disabled={loading}
+          />
+          <button
+            type="submit"
+            disabled={loading || !query.trim()}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm flex-shrink-0"
+          >
+            {loading ? (
+              <span className="flex items-center gap-2">
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                    fill="none"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+              </span>
+            ) : (
+              'Search'
+            )}
+          </button>
+        </form>
+      </header>
+
+      {/* Main content area - split view when results, examples when empty */}
+      {!response && !error && !loading ? (
+        /* Empty State */
+        <div className="flex-1 overflow-auto scrollable-y">
+          <div className="px-4 py-6">
+            {/* Example queries */}
+            <p className="text-sm text-gray-400 mb-3">Try these examples:</p>
+            <div className="flex flex-wrap gap-2 mb-8">
+              {EXAMPLE_QUERIES.map((example) => (
+                <button
+                  key={example}
+                  onClick={() => handleSearch(example)}
+                  disabled={loading}
+                  className="px-3 py-1.5 text-sm text-gray-300 bg-gray-800 border border-gray-700 rounded-full hover:bg-gray-700 hover:border-gray-600 disabled:opacity-50"
+                >
+                  {example}
+                </button>
+              ))}
+            </div>
+
+            {/* Empty state illustration */}
+            <div className="text-center py-12">
+              <svg
+                className="w-16 h-16 text-gray-700 mx-auto mb-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+              <h2 className="text-lg font-medium text-gray-400 mb-2">
+                Search your photo graph
+              </h2>
+              <p className="text-gray-500 text-sm">
+                Ask questions in natural language to find relevant photos
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* Results View - Split Layout */
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Error */}
+          {error && (
+            <div className="flex-shrink-0 mx-4 mt-4 p-3 bg-red-900/50 border border-red-700 rounded-lg text-red-300 text-sm">
+              {error}
+            </div>
+          )}
+
+          {response && (
+            <>
+              {/* Map placeholder - 40% height */}
+              <div className="flex-shrink-0 h-[35vh] min-h-[180px] border-b border-gray-800">
+                <MapPlaceholder
+                  photoCount={gpsStats.total}
+                  gpsCount={gpsStats.withGps}
+                />
+              </div>
+
+              {/* Results header */}
+              <div className="flex-shrink-0 px-4 py-2 bg-gray-900 border-b border-gray-800 flex items-center justify-between">
+                <p className="text-sm text-gray-400">
+                  <span className="text-white font-medium">{response.results.length}</span> photos
+                  <span className="text-gray-600 mx-2">·</span>
+                  <span className="text-gray-500">{response.executionTimeMs}ms</span>
+                </p>
+                <button
+                  onClick={() => setShowCypher(!showCypher)}
+                  className="text-xs text-gray-500 hover:text-gray-400"
+                >
+                  {showCypher ? 'Hide' : 'Show'} Cypher
+                </button>
+              </div>
+
+              {/* Cypher query (collapsible) */}
+              {showCypher && (
+                <div className="flex-shrink-0 px-4 py-2 bg-gray-800 border-b border-gray-700">
+                  <code className="text-xs text-green-400 font-mono break-all">
+                    {response.cypherQuery}
+                  </code>
+                </div>
+              )}
+
+              {/* Results list - scrollable */}
+              <div className="flex-1 overflow-auto scrollable-y">
+                {response.results.length === 0 ? (
+                  <div className="text-center py-12 text-gray-500">
+                    No photos found matching your query
+                  </div>
+                ) : (
+                  <div className="p-4 space-y-3">
+                    {response.results.map((result) => (
+                      <SearchResultCard
+                        key={result.photo.id}
+                        photoId={result.photo.id}
+                        imageUrl={result.photo.imageUrl}
+                        vlmDescription={result.photo.vlmDescription}
+                        recPotential={result.photo.recPotential}
+                        location={result.photo.location}
+                        entities={result.entities}
+                        timestamp={result.photo.timestamp}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* Bottom safe area */}
+                <div className="h-6" />
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
 export default function GraphSearchPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-500">Loading...</div>
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="h-screen bg-gray-900 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500" />
+        </div>
+      }
+    >
       <GraphSearchContent />
     </Suspense>
   );
