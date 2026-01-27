@@ -9,6 +9,11 @@ interface Entity {
   severity: string;
 }
 
+interface LocationEntry {
+  name: string;
+  level: string;
+}
+
 interface SearchResultCardProps {
   photoId: string;
   imageUrl: string;
@@ -17,6 +22,8 @@ interface SearchResultCardProps {
   location: { latitude: number; longitude: number } | null;
   entities: Entity[];
   timestamp: string;
+  projectType?: string;
+  locations?: LocationEntry[];
 }
 
 export default function SearchResultCard({
@@ -27,8 +34,12 @@ export default function SearchResultCard({
   location,
   entities,
   timestamp,
+  projectType,
+  locations,
 }: SearchResultCardProps) {
   const [imageError, setImageError] = useState(false);
+
+  const isInventory = projectType === 'home-inventory';
 
   const getRecBadgeColor = (rec: string) => {
     switch (rec) {
@@ -61,7 +72,7 @@ export default function SearchResultCard({
 
   // Format GPS accuracy display
   const gpsDisplay = location
-    ? `${location.latitude.toFixed(4)}°, ${location.longitude.toFixed(4)}°`
+    ? `${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}`
     : null;
 
   // Truncate description
@@ -69,6 +80,10 @@ export default function SearchResultCard({
     vlmDescription.length > 100
       ? vlmDescription.slice(0, 100) + '...'
       : vlmDescription;
+
+  // Build location label for inventory
+  const roomName = locations?.find(l => l.level === 'room')?.name;
+  const containerName = locations?.find(l => l.level === 'container')?.name;
 
   return (
     <Link href={`/graph/photo/${photoId}`}>
@@ -88,7 +103,7 @@ export default function SearchResultCard({
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth={1.5}
-                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2 2v12a2 2 0 002 2z"
                   />
                 </svg>
                 <span className="text-[10px] text-gray-500 mt-0.5">{shortId}</span>
@@ -105,15 +120,32 @@ export default function SearchResultCard({
 
           {/* Content */}
           <div className="flex-1 p-3 min-w-0">
-            {/* Top row: REC badge + GPS */}
+            {/* Top row: Context badge + GPS */}
             <div className="flex items-center justify-between mb-1.5">
-              <span
-                className={`text-xs font-medium px-2 py-0.5 rounded ${getRecBadgeColor(
-                  recPotential
-                )}`}
-              >
-                REC: {recPotential || 'none'}
-              </span>
+              {isInventory ? (
+                // Inventory: show room/location badge
+                roomName ? (
+                  <span className="text-xs font-medium px-2 py-0.5 rounded bg-indigo-600 text-white truncate max-w-[200px]">
+                    {roomName}
+                    {containerName && (
+                      <span className="text-indigo-200"> &gt; {containerName}</span>
+                    )}
+                  </span>
+                ) : (
+                  <span className="text-xs font-medium px-2 py-0.5 rounded bg-gray-600 text-gray-300">
+                    No location
+                  </span>
+                )
+              ) : (
+                // ESA/Generic: show REC badge
+                <span
+                  className={`text-xs font-medium px-2 py-0.5 rounded ${getRecBadgeColor(
+                    recPotential
+                  )}`}
+                >
+                  REC: {recPotential || 'none'}
+                </span>
+              )}
               {gpsDisplay && (
                 <span className="text-xs text-gray-400 flex items-center gap-1">
                   <svg
@@ -145,11 +177,13 @@ export default function SearchResultCard({
                 {entities.slice(0, 3).map((entity, idx) => (
                   <span
                     key={idx}
-                    className={`text-[10px] px-1.5 py-0.5 rounded border ${getSeverityColor(
-                      entity.severity
-                    )}`}
+                    className={`text-[10px] px-1.5 py-0.5 rounded border ${
+                      isInventory
+                        ? 'bg-gray-700/50 text-gray-300 border-gray-600'
+                        : getSeverityColor(entity.severity)
+                    }`}
                   >
-                    {entity.entityType}
+                    {isInventory ? entity.description : entity.entityType}
                   </span>
                 ))}
                 {entities.length > 3 && (

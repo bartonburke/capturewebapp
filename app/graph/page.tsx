@@ -20,6 +20,10 @@ interface SearchResult {
     description: string;
     severity: string;
   }>;
+  locations?: Array<{
+    name: string;
+    level: string;
+  }>;
 }
 
 interface SearchResponse {
@@ -30,7 +34,7 @@ interface SearchResponse {
   error?: string;
 }
 
-const EXAMPLE_QUERIES = [
+const ESA_QUERIES = [
   'all photos',
   'photos with AOCs',
   'photos showing staining or water damage',
@@ -39,9 +43,21 @@ const EXAMPLE_QUERIES = [
   'photos showing pipes or drains',
 ];
 
+const INVENTORY_QUERIES = [
+  'all photos',
+  'what rooms have been captured?',
+  'items in the kitchen',
+  'where is the drill?',
+  'show me the garage',
+  'what\'s in the closet?',
+];
+
 function GraphSearchContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get('sessionId');
+  const projectType = searchParams.get('projectType');
+
+  const exampleQueries = projectType === 'home-inventory' ? INVENTORY_QUERIES : ESA_QUERIES;
 
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
@@ -60,7 +76,11 @@ function GraphSearchContent() {
       const res = await fetch('/api/graph/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: searchQuery, sessionId: sessionId || undefined }),
+        body: JSON.stringify({
+          query: searchQuery,
+          sessionId: sessionId || undefined,
+          projectType: projectType || undefined,
+        }),
       });
 
       const data: SearchResponse = await res.json();
@@ -174,7 +194,7 @@ function GraphSearchContent() {
             {/* Example queries */}
             <p className="text-sm text-gray-400 mb-3">Try these examples:</p>
             <div className="flex flex-wrap gap-2 mb-8">
-              {EXAMPLE_QUERIES.map((example) => (
+              {exampleQueries.map((example) => (
                 <button
                   key={example}
                   onClick={() => handleSearch(example)}
@@ -222,11 +242,12 @@ function GraphSearchContent() {
 
           {response && (
             <>
-              {/* Map placeholder - 40% height */}
-              <div className="flex-shrink-0 h-[35vh] min-h-[180px] border-b border-gray-800">
+              {/* Map placeholder - compact */}
+              <div className="flex-shrink-0 h-[20vh] min-h-[100px] border-b border-gray-800">
                 <MapPlaceholder
                   photoCount={gpsStats.total}
                   gpsCount={gpsStats.withGps}
+                  compact
                 />
               </div>
 
@@ -272,6 +293,8 @@ function GraphSearchContent() {
                         location={result.photo.location}
                         entities={result.entities}
                         timestamp={result.photo.timestamp}
+                        projectType={projectType || undefined}
+                        locations={result.locations}
                       />
                     ))}
                   </div>

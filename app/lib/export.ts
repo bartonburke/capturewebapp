@@ -199,6 +199,12 @@ interface PortablePhotoEntry {
     ai_response?: string;      // Answer to consultant's question (if detected)
   };
   tags: string[];
+  // Home inventory graph-ready fields
+  room?: string;
+  area?: string | null;
+  container?: string | null;
+  items?: Array<{ name: string; attributes?: Record<string, string> }>;
+  notes?: string[];
 }
 
 // Portable evidence package index.json schema
@@ -511,6 +517,17 @@ export async function exportProcessedSession(
         confidence: 0.9,
       };
       entry.entities = analysis.entities.map(e => e.description);
+
+      // Preserve home-inventory graph-ready fields
+      if (analysis.room) {
+        entry.room = analysis.room;
+        entry.area = analysis.area ?? null;
+        entry.container = analysis.container ?? null;
+        entry.items = analysis.items;
+        entry.notes = analysis.entities
+          .filter(e => e.type === 'note')
+          .map(e => e.description);
+      }
     }
 
     photoEntries.push(entry);

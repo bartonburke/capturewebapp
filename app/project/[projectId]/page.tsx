@@ -684,7 +684,7 @@ export default function ProjectDetailsPage() {
             </div>
             <div className="flex gap-2">
               <button
-                onClick={() => router.push(`/graph?sessionId=${project.launchSessionId || project.id}`)}
+                onClick={() => router.push(`/graph?sessionId=${project.launchSessionId || project.id}&projectType=${project.projectType || 'generic'}`)}
                 className="p-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-xl transition-colors flex-shrink-0"
                 aria-label="Search in project"
                 title="Search in project"

@@ -3,9 +3,10 @@
 interface MapPlaceholderProps {
   photoCount: number;
   gpsCount: number;
+  compact?: boolean;
 }
 
-export default function MapPlaceholder({ photoCount, gpsCount }: MapPlaceholderProps) {
+export default function MapPlaceholder({ photoCount, gpsCount, compact = false }: MapPlaceholderProps) {
   return (
     <div className="h-full w-full bg-gray-800 flex flex-col items-center justify-center relative overflow-hidden">
       {/* Subtle grid pattern */}
@@ -22,7 +23,7 @@ export default function MapPlaceholder({ photoCount, gpsCount }: MapPlaceholderP
 
       {/* Map pin icon */}
       <svg
-        className="w-16 h-16 text-gray-500 mb-3"
+        className={`${compact ? 'w-8 h-8 mb-1' : 'w-16 h-16 mb-3'} text-gray-500`}
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"
@@ -41,10 +42,12 @@ export default function MapPlaceholder({ photoCount, gpsCount }: MapPlaceholderP
         />
       </svg>
 
-      <p className="text-gray-400 text-sm font-medium mb-1">Map view coming soon</p>
+      {!compact && (
+        <p className="text-gray-400 text-sm font-medium mb-1">Map view coming soon</p>
+      )}
 
       {photoCount > 0 && (
-        <p className="text-gray-500 text-xs">
+        <p className={`text-gray-500 ${compact ? 'text-[10px]' : 'text-xs'}`}>
           {gpsCount > 0
             ? `${gpsCount} of ${photoCount} photos with GPS data`
             : `${photoCount} photos (no GPS data)`
@@ -52,8 +55,8 @@ export default function MapPlaceholder({ photoCount, gpsCount }: MapPlaceholderP
         </p>
       )}
 
-      {/* Decorative pins */}
-      {gpsCount > 0 && (
+      {/* Decorative pins - only when not compact */}
+      {!compact && gpsCount > 0 && (
         <>
           <div className="absolute top-[25%] left-[30%]">
             <div className="w-3 h-3 bg-blue-500 rounded-full opacity-40" />
