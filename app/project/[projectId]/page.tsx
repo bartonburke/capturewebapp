@@ -873,14 +873,111 @@ export default function ProjectDetailsPage() {
         {/* Synthesis Deliverables Section - Home Inventory */}
         {processingResult?.synthesis && processingResult.synthesis.deliverables.length > 0 && (
           <section className="mb-8">
-            <h2 className="text-white font-semibold text-lg flex items-center gap-2 mb-3">
-              <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-              </svg>
-              Inventory Summary
-            </h2>
+            {/* Hero Stats Bar */}
+            <div className="bg-gradient-to-r from-emerald-600 to-green-500 rounded-xl p-6 mb-4">
+              <h2 className="text-white font-bold text-xl mb-4 flex items-center gap-2">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                </svg>
+                Inventory Complete
+              </h2>
+              <div className="grid grid-cols-3 gap-4 text-center">
+                <div className="bg-white/20 backdrop-blur-sm rounded-lg p-3">
+                  <div className="text-3xl font-bold text-white">
+                    {processingResult.synthesis.entityClusters.filter(c => c.entityType === 'item').length}
+                  </div>
+                  <div className="text-white/80 text-sm">Items</div>
+                </div>
+                <div className="bg-white/20 backdrop-blur-sm rounded-lg p-3">
+                  <div className="text-3xl font-bold text-white">
+                    {processingResult.synthesis.locationHierarchy.filter(l => l.level === 'room').length}
+                  </div>
+                  <div className="text-white/80 text-sm">Rooms</div>
+                </div>
+                <div className="bg-white/20 backdrop-blur-sm rounded-lg p-3">
+                  <div className="text-3xl font-bold text-white">
+                    {processingResult.synthesis.coverageAnalysis
+                      ? Math.round(processingResult.synthesis.coverageAnalysis.completenessScore * 100)
+                      : '—'}%
+                  </div>
+                  <div className="text-white/80 text-sm">Coverage</div>
+                </div>
+              </div>
+            </div>
 
-            {/* Export Button - Full width, prominent */}
+            {/* Room Pills - Horizontal Scroll */}
+            {processingResult.synthesis.locationHierarchy.filter(l => l.level === 'room').length > 0 && (
+              <div className="flex gap-2 overflow-x-auto pb-2 mb-4 scrollbar-thin scrollbar-thumb-gray-600">
+                {processingResult.synthesis.locationHierarchy
+                  .filter(l => l.level === 'room')
+                  .sort((a, b) => b.itemCount - a.itemCount)
+                  .map(room => (
+                    <span
+                      key={room.id}
+                      className="flex-shrink-0 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-full text-sm text-white transition-colors"
+                    >
+                      {room.name} <span className="text-gray-400">({room.itemCount})</span>
+                    </span>
+                  ))}
+              </div>
+            )}
+
+            {/* Top Items Grid */}
+            {processingResult.synthesis.entityClusters.filter(c => c.entityType === 'item').length > 0 && (
+              <div className="mb-4">
+                <h3 className="text-gray-400 text-sm font-medium mb-2 flex items-center gap-1.5">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                  </svg>
+                  What We Found
+                </h3>
+                <div className="grid grid-cols-2 gap-2">
+                  {processingResult.synthesis.entityClusters
+                    .filter(c => c.entityType === 'item')
+                    .slice(0, 6)
+                    .map(item => (
+                      <div
+                        key={item.clusterId}
+                        className="bg-gray-800 rounded-lg p-3 border border-gray-700 hover:border-gray-600 transition-colors"
+                      >
+                        <div className="text-white font-medium truncate">{item.canonicalName}</div>
+                        <div className="text-gray-400 text-xs truncate mt-0.5">
+                          {item.locations.length > 0 ? item.locations.join(', ') : 'Unknown location'}
+                        </div>
+                        <div className="text-gray-500 text-xs mt-1 flex items-center gap-1">
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                          {item.photoIds.length} photo{item.photoIds.length !== 1 ? 's' : ''}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+                {processingResult.synthesis.entityClusters.filter(c => c.entityType === 'item').length > 6 && (
+                  <div className="text-gray-500 text-sm text-center mt-3">
+                    + {processingResult.synthesis.entityClusters.filter(c => c.entityType === 'item').length - 6} more items
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Coverage Warning */}
+            {processingResult.synthesis.coverageAnalysis?.missingLocations.length > 0 && (
+              <div className="bg-yellow-900/30 border border-yellow-700/50 rounded-lg p-3 mb-4">
+                <div className="text-yellow-400 text-sm flex items-start gap-2">
+                  <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <div>
+                    <span className="font-medium">Mentioned but not photographed:</span>
+                    <span className="ml-1">{processingResult.synthesis.coverageAnalysis.missingLocations.join(', ')}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Export Button */}
             <button
               onClick={async () => {
                 if (!project || !processingResult) return;
@@ -918,15 +1015,18 @@ export default function ProjectDetailsPage() {
                 </>
               )}
             </button>
-            <div className="space-y-4">
+
+            {/* Collapsed Deliverables - Full Details */}
+            <div className="space-y-2">
+              <h3 className="text-gray-500 text-xs font-medium uppercase tracking-wider mb-2">Detailed Reports</h3>
               {processingResult.synthesis.deliverables.map((deliverable) => (
                 <details
                   key={deliverable.id}
-                  className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden"
+                  className="bg-gray-800/50 rounded-lg border border-gray-700 overflow-hidden"
                 >
-                  <summary className="px-4 py-3 cursor-pointer hover:bg-gray-750 flex items-center justify-between">
-                    <span className="text-white font-medium">{deliverable.title}</span>
-                    <svg className="w-5 h-5 text-gray-400 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <summary className="px-4 py-3 cursor-pointer hover:bg-gray-800 flex items-center justify-between transition-colors">
+                    <span className="text-gray-300 font-medium text-sm">{deliverable.title}</span>
+                    <svg className="w-4 h-4 text-gray-500 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
                   </summary>
@@ -940,23 +1040,6 @@ export default function ProjectDetailsPage() {
                 </details>
               ))}
             </div>
-
-            {/* Coverage Score */}
-            {processingResult.synthesis.coverageAnalysis && (
-              <div className="mt-4 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-400 text-sm">Coverage</span>
-                  <span className="text-white font-medium">
-                    {Math.round(processingResult.synthesis.coverageAnalysis.completenessScore * 100)}%
-                  </span>
-                </div>
-                {processingResult.synthesis.coverageAnalysis.missingLocations.length > 0 && (
-                  <p className="text-yellow-400 text-xs mt-1">
-                    Missing: {processingResult.synthesis.coverageAnalysis.missingLocations.join(', ')}
-                  </p>
-                )}
-              </div>
-            )}
           </section>
         )}
 
