@@ -128,7 +128,8 @@ export async function POST(req: NextRequest): Promise<NextResponse<SearchRespons
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let photoNode: { properties: Record<string, any> } | null = null;
       try {
-        photoNode = record.get('p') as typeof photoNode;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        photoNode = record.get('p') as { properties: Record<string, any> } | null;
       } catch {
         // No photo node in this record
         continue;
