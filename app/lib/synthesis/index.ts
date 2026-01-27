@@ -6,21 +6,17 @@
  * project-type-specific deliverables.
  */
 
-import {
+import type {
   ProjectType,
   SessionSynthesis,
   PhotoAnalysis,
   Transcript,
-  EntityCluster,
-  LocationNode,
-  SearchIndexEntry,
-  CoverageAnalysis,
-  SynthesisDeliverable,
 } from '@/app/lib/types';
 import { queryGraphForSynthesis, GraphSynthesisData } from './graph-queries';
 import { runLLMSynthesis, LLMSynthesisResult } from './llm-synthesis';
 import { generateDeliverables } from './deliverables';
 import { SYNTHESIS_CONFIGS } from './configs';
+import { buildSearchIndex } from './search-index';
 
 export interface SynthesisInput {
   sessionId: string;
@@ -89,7 +85,8 @@ export async function synthesizeSession(input: SynthesisInput): Promise<SessionS
   const searchIndex = buildSearchIndex(
     photoAnalyses,
     llmResult.entityClusters,
-    llmResult.locationHierarchy
+    llmResult.locationHierarchy,
+    config?.searchSchema
   );
 
   const synthesis: SessionSynthesis = {
@@ -112,82 +109,8 @@ export async function synthesizeSession(input: SynthesisInput): Promise<SessionS
   return synthesis;
 }
 
-/**
- * Build search index from synthesis results
- */
-function buildSearchIndex(
-  photoAnalyses: PhotoAnalysis[],
-  entityClusters: EntityCluster[],
-  locationHierarchy: LocationNode[]
-): SearchIndexEntry[] {
-  const index: SearchIndexEntry[] = [];
-  const termMap = new Map<string, SearchIndexEntry>();
-
-  // Index items from entity clusters
-  for (const cluster of entityClusters) {
-    const term = cluster.canonicalName.toLowerCase();
-    if (!termMap.has(term)) {
-      termMap.set(term, {
-        term,
-        type: cluster.entityType === 'location' ? 'location' :
-              cluster.entityType === 'container' ? 'container' : 'item',
-        matches: [],
-      });
-    }
-    const entry = termMap.get(term)!;
-    for (const photoId of cluster.photoIds) {
-      entry.matches.push({
-        photoId,
-        clusterId: cluster.clusterId,
-        relevance: cluster.confidence,
-        context: cluster.mergedDescription,
-      });
-    }
-  }
-
-  // Index locations
-  for (const loc of locationHierarchy) {
-    const term = loc.name.toLowerCase();
-    if (!termMap.has(term)) {
-      termMap.set(term, {
-        term,
-        type: 'location',
-        matches: [],
-      });
-    }
-    const entry = termMap.get(term)!;
-    for (const photoId of loc.photoIds) {
-      entry.matches.push({
-        photoId,
-        relevance: 1.0,
-        context: `${loc.level}: ${loc.name}`,
-      });
-    }
-  }
-
-  // Index catalog tags from photos
-  for (const analysis of photoAnalyses) {
-    for (const tag of analysis.catalogTags) {
-      const term = tag.toLowerCase();
-      if (!termMap.has(term)) {
-        termMap.set(term, {
-          term,
-          type: 'tag',
-          matches: [],
-        });
-      }
-      const entry = termMap.get(term)!;
-      entry.matches.push({
-        photoId: analysis.photoId,
-        relevance: 0.8,
-      });
-    }
-  }
-
-  return Array.from(termMap.values());
-}
-
 // Re-export for external use
+export { buildSearchIndex } from './search-index';
 export { queryGraphForSynthesis } from './graph-queries';
 export { runLLMSynthesis } from './llm-synthesis';
 export { generateDeliverables } from './deliverables';

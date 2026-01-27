@@ -259,7 +259,7 @@ export interface LocationNode {
 // Search index entry for fast lookup
 export interface SearchIndexEntry {
   term: string;                 // Search term (item name, category, etc.)
-  type: 'item' | 'location' | 'category' | 'tag' | 'container';
+  type: 'item' | 'location' | 'category' | 'tag' | 'container' | 'room' | 'attribute';
   matches: SearchMatch[];
 }
 

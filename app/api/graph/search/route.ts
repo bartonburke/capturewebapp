@@ -1,89 +1,27 @@
 /**
  * POST /api/graph/search
  *
- * Natural language search over the photo graph
- * Translates NL queries to Cypher via LLM, executes against Neo4j
+ * Natural language search over the photo graph.
+ * Translates NL queries to Cypher via LLM, executes against Neo4j.
  *
- * Supports both OpenAI and Claude providers (defaults to OpenAI)
+ * Now schema-driven: accepts optional `projectType` to generate a
+ * project-type-aware system prompt from the SearchSchema config.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { runQuery } from '@/app/lib/neo4j';
+import { ProjectType } from '@/app/lib/types';
+import {
+  getSearchSchema,
+  buildSystemPrompt,
+  SearchSchema,
+} from '@/app/lib/synthesis/configs';
 
 // Initialize OpenAI client
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
-
-// System prompt for NL→Cypher translation
-// Build system prompt with optional session filter context
-function buildSystemPrompt(sessionId?: string): string {
-  const sessionFilter = sessionId
-    ? `\n\nIMPORTANT: All queries MUST filter by sessionId = '${sessionId}'. Add this WHERE clause to every query.`
-    : '';
-
-  const sessionExamples = sessionId
-    ? `
-
-Q: "all photos" (with sessionId filter)
-A: MATCH (p:Photo) WHERE p.sessionId = '${sessionId}' RETURN p LIMIT 50
-
-Q: "photos with AOCs" (with sessionId filter)
-A: MATCH (p:Photo)-[:SHOWS]->(e:Entity) WHERE p.sessionId = '${sessionId}' AND e.entityType = 'AOC' RETURN p, e`
-    : '';
-
-  return `You are a Cypher query generator for a photo graph database.
-
-Schema:
-- (:Photo {id, timestamp, location: point, vlmDescription, catalogTags: [string], imageUrl, sessionId, recPotential, confidence})
-- (:Entity {id, entityType, description, severity, sessionId})
-- (Photo)-[:SHOWS {confidence}]->(Entity)
-
-Entity types: REC, AOC, Feature, Condition, Observation
-Severity levels: high, medium, low, info
-recPotential levels: high, medium, low, none
-
-Spatial functions:
-- point.distance(p.location, point({latitude: $lat, longitude: $lng})) returns distance in meters
-- point({latitude: $lat, longitude: $lng}) creates a point
-
-Text search:
-- Use CONTAINS for partial text matching (case-sensitive)
-- Use toLower() for case-insensitive: toLower(p.vlmDescription) CONTAINS toLower('search term')
-${sessionFilter}
-
-Given a natural language query, generate ONLY the Cypher query. No explanation, no markdown, no backticks.
-
-Examples:
-
-Q: "all photos"
-A: MATCH (p:Photo) RETURN p LIMIT 50
-
-Q: "photos near 37.7749, -122.4194"
-A: MATCH (p:Photo) WHERE point.distance(p.location, point({latitude: 37.7749, longitude: -122.4194})) < 500 RETURN p
-
-Q: "photos showing staining"
-A: MATCH (p:Photo) WHERE toLower(p.vlmDescription) CONTAINS 'staining' RETURN p
-
-Q: "photos with AOCs"
-A: MATCH (p:Photo)-[:SHOWS]->(e:Entity) WHERE e.entityType = 'AOC' RETURN p, e
-
-Q: "high severity findings"
-A: MATCH (p:Photo)-[:SHOWS]->(e:Entity) WHERE e.severity = 'high' RETURN p, e
-
-Q: "photos within 100m of 33.725, -118.305"
-A: MATCH (p:Photo) WHERE point.distance(p.location, point({latitude: 33.725, longitude: -118.305})) < 100 RETURN p
-
-Q: "environmental concerns"
-A: MATCH (p:Photo)-[:SHOWS]->(e:Entity) WHERE e.entityType IN ['REC', 'AOC'] OR e.severity IN ['high', 'medium'] RETURN p, e
-
-Q: "photos showing drains or pipes"
-A: MATCH (p:Photo) WHERE toLower(p.vlmDescription) CONTAINS 'drain' OR toLower(p.vlmDescription) CONTAINS 'pipe' RETURN p
-${sessionExamples}
-
-Always include LIMIT 50 if no limit is specified to prevent large result sets.`;
-}
 
 interface SearchResult {
   photo: {
@@ -99,6 +37,10 @@ interface SearchResult {
     description: string;
     severity: string;
   }>;
+  locations?: Array<{
+    name: string;
+    level: string;
+  }>;
 }
 
 interface SearchResponse {
@@ -112,14 +54,14 @@ interface SearchResponse {
 /**
  * Generate Cypher query from natural language using OpenAI
  */
-async function generateCypherWithOpenAI(query: string, sessionId?: string): Promise<string> {
+async function generateCypherWithOpenAI(query: string, sessionId?: string, searchSchema?: SearchSchema): Promise<string> {
   const response = await openai.chat.completions.create({
     model: 'gpt-4o-mini',
     max_tokens: 500,
     messages: [
       {
         role: 'system',
-        content: buildSystemPrompt(sessionId),
+        content: buildSystemPrompt(sessionId, searchSchema),
       },
       {
         role: 'user',
@@ -147,7 +89,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<SearchRespons
 
   try {
     const body = await req.json();
-    const { query, sessionId } = body;
+    const { query, sessionId, projectType } = body;
 
     if (!query || typeof query !== 'string') {
       return NextResponse.json(
@@ -162,10 +104,15 @@ export async function POST(req: NextRequest): Promise<NextResponse<SearchRespons
       );
     }
 
-    console.log(`[GraphSearch] Query: "${query}"${sessionId ? ` (sessionId: ${sessionId})` : ''}`);
+    console.log(`[GraphSearch] Query: "${query}"${sessionId ? ` (sessionId: ${sessionId})` : ''}${projectType ? ` (type: ${projectType})` : ''}`);
 
-    // Step 1: Translate NL to Cypher using OpenAI (with optional session filter)
-    const cypherQuery = await generateCypherWithOpenAI(query, sessionId);
+    // Look up search schema for this project type
+    const searchSchema = projectType
+      ? getSearchSchema(projectType as ProjectType)
+      : undefined;
+
+    // Step 1: Translate NL to Cypher using OpenAI (with type-aware schema)
+    const cypherQuery = await generateCypherWithOpenAI(query, sessionId, searchSchema);
 
     console.log(`[GraphSearch] Generated Cypher: ${cypherQuery}`);
 
@@ -179,7 +126,13 @@ export async function POST(req: NextRequest): Promise<NextResponse<SearchRespons
     for (const record of result.records) {
       // Extract photo node (could be 'p' or other variable name)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const photoNode = record.get('p') as { properties: Record<string, any> } | null;
+      let photoNode: { properties: Record<string, any> } | null = null;
+      try {
+        photoNode = record.get('p');
+      } catch {
+        // No photo node in this record
+        continue;
+      }
 
       if (!photoNode || seenPhotoIds.has(photoNode.properties.id)) {
         continue;
@@ -200,8 +153,6 @@ export async function POST(req: NextRequest): Promise<NextResponse<SearchRespons
 
       // Collect entities for this photo
       const entities: SearchResult['entities'] = [];
-
-      // Try to get entity from record if it exists
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const entityNode = record.get('e') as { properties: Record<string, any> } | null;
@@ -213,7 +164,39 @@ export async function POST(req: NextRequest): Promise<NextResponse<SearchRespons
           });
         }
       } catch {
-        // No entity in this record, that's fine
+        // No entity in this record — expected for inventory queries
+      }
+
+      // Collect items (aliased as 'i' in inventory queries)
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const itemNode = record.get('i') as { properties: Record<string, any> } | null;
+        if (itemNode) {
+          entities.push({
+            entityType: itemNode.properties.entityType || 'item',
+            description: itemNode.properties.name || itemNode.properties.description,
+            severity: 'info',
+          });
+        }
+      } catch {
+        // No item node — expected for non-inventory queries
+      }
+
+      // Collect locations (aliased as 'l' or 'c' in inventory queries)
+      const locations: SearchResult['locations'] = [];
+      for (const varName of ['l', 'c']) {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const locNode = record.get(varName) as { properties: Record<string, any> } | null;
+          if (locNode) {
+            locations.push({
+              name: locNode.properties.name,
+              level: locNode.properties.level,
+            });
+          }
+        } catch {
+          // Variable not in this record
+        }
       }
 
       results.push({
@@ -226,6 +209,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<SearchRespons
           recPotential: photoProps.recPotential,
         },
         entities,
+        ...(locations.length > 0 ? { locations } : {}),
       });
     }
 
