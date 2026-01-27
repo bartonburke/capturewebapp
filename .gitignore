@@ -48,3 +48,10 @@ evidence/sessions/*
 
 # test export files
 site-visit-*.zip
+
+# internal docs (new files only; existing tracked docs are kept)
+/docs/*
+!docs/SPATIAL-SEARCH-ARCHITECTURE.md
+!docs/graph-database-briefing.md
+!docs/photo-graph-schema.md
+!docs/photos-as-navigation-primitives.md
