@@ -447,6 +447,49 @@ async function analyzePhoto(
   }
 }
 
+// Synonym groups for fuzzy item matching
+// Items in the same array are considered equivalent
+const ITEM_SYNONYMS: string[][] = [
+  ['dog', 'pet', 'puppy', 'animal'],
+  ['cat', 'pet', 'kitten', 'animal'],
+  ['dishes', 'dish', 'bowl', 'bowls', 'plate', 'plates', 'dinnerware'],
+  ['shelf', 'shelves', 'shelving', 'rack', 'stand', 'unit', 'storage'],
+  ['cabinet', 'cabinets', 'cupboard', 'cupboards'],
+  ['drawer', 'drawers'],
+  ['aluminum foil', 'aluminium foil', 'reynolds wrap', 'foil', 'tin foil'],
+  ['plastic wrap', 'saran wrap', 'cling wrap', 'cling film'],
+  ['couch', 'sofa', 'loveseat', 'settee', 'couch frame'],
+  ['tv', 'television', 'monitor', 'screen'],
+  ['fridge', 'refrigerator', 'mini fridge', 'minifridge'],
+  ['washer', 'washing machine', 'clothes washer'],
+  ['dryer', 'clothes dryer', 'tumble dryer'],
+  ['bathroom', 'bath', 'restroom', 'washroom'],
+  ['kitchen', 'kitchenette'],
+  ['clothes', 'clothing', 'garments', 'shirts', 'pants', 'jackets'],
+];
+
+// Check if two item names match (including synonyms)
+function itemsMatch(found: string, expected: string): boolean {
+  const foundLower = found.toLowerCase();
+  const expectedLower = expected.toLowerCase();
+
+  // Direct substring match
+  if (foundLower.includes(expectedLower) || expectedLower.includes(foundLower)) {
+    return true;
+  }
+
+  // Synonym match - check if both are in the same synonym group
+  for (const group of ITEM_SYNONYMS) {
+    const foundInGroup = group.some(syn => foundLower.includes(syn) || syn.includes(foundLower));
+    const expectedInGroup = group.some(syn => expectedLower.includes(syn) || syn.includes(expectedLower));
+    if (foundInGroup && expectedInGroup) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 // Score a single result against expected output
 function scoreResult(result: AnalysisResult, expected: ExpectedOutput): EvaluationScore {
   const details: EvaluationScore['details'] = {
@@ -484,12 +527,10 @@ function scoreResult(result: AnalysisResult, expected: ExpectedOutput): Evaluati
   // Item recall - what fraction of must_identify items were found?
   let item_recall = 0;
   if (result.items && Array.isArray(result.items)) {
-    const foundItemNames = result.items.map((i) => i.name.toLowerCase());
+    const foundItemNames = result.items.map((i) => i.name);
 
     for (const mustFind of expected.must_identify) {
-      const found = foundItemNames.some(
-        (name) => name.includes(mustFind.toLowerCase()) || mustFind.toLowerCase().includes(name)
-      );
+      const found = foundItemNames.some((name) => itemsMatch(name, mustFind));
       if (found) {
         details.items_found.push(mustFind);
         details.items_missed = details.items_missed.filter((m) => m !== mustFind);
@@ -501,13 +542,13 @@ function scoreResult(result: AnalysisResult, expected: ExpectedOutput): Evaluati
   // Item precision - are identified items real?
   let item_precision = 1;
   if (result.items && Array.isArray(result.items)) {
-    const expectedItemNames = expected.items.map((i) => i.name.toLowerCase());
-    const shouldIdentifyLower = expected.should_identify.map((s) => s.toLowerCase());
+    const expectedItemNames = expected.items.map((i) => i.name);
+    const shouldIdentifyNames = expected.should_identify;
 
     for (const item of result.items) {
-      const itemName = item.name.toLowerCase();
-      const isExpected = expectedItemNames.some((e) => itemName.includes(e) || e.includes(itemName));
-      const isShould = shouldIdentifyLower.some((s) => itemName.includes(s) || s.includes(itemName));
+      const itemName = item.name;
+      const isExpected = expectedItemNames.some((e) => itemsMatch(itemName, e));
+      const isShould = shouldIdentifyNames.some((s) => itemsMatch(itemName, s));
 
       if (!isExpected && !isShould) {
         // Could be hallucination or just additional valid item

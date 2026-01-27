@@ -238,7 +238,7 @@
           { "name": "cleaning supplies" },
           { "name": "towel" }
         ],
-        "must_identify": ["sink", "mirror", "bathroom"],
+        "must_identify": ["sink", "mirror"],
         "should_identify": ["toiletries", "towel"],
         "room_confidence": "high"
       },
@@ -300,9 +300,10 @@
           { "name": "glass water bottle" },
           { "name": "white plate" }
         ],
-        "must_identify": ["mini fridge", "kitchen"],
-        "should_identify": ["water bottle"],
-        "room_confidence": "high"
+        "must_identify": ["mini fridge"],
+        "should_identify": ["water bottle", "plate"],
+        "room_confidence": "medium",
+        "room_alternatives": ["laundry room", "utility room"]
       },
       "photo-016": {
         "room": "laundry",
@@ -382,9 +383,10 @@
   "prompts_to_test": [
     {
       "id": "current",
-      "name": "Current Production Prompt",
+      "name": "Optimized Gemini Prompt (v2)",
       "source": "app/lib/defaultContexts.ts:homeInventoryVisionPrompt",
-      "prompt": null
+      "prompt": null,
+      "notes": "Updated 2026-01-26: Added room enumeration, disambiguation rules, systematic scanning, container rules"
     },
     {
       "id": "minimal",

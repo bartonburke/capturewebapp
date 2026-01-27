@@ -11,6 +11,55 @@ import { PhotoMetadata, Transcript, TranscriptSegment } from './types';
 /** Maximum seconds between photo and transcript segment for correlation */
 export const CORRELATION_THRESHOLD_SECONDS = 15;
 
+/** Context window size in seconds before and after photo timestamp */
+export const CONTEXT_WINDOW_SECONDS = 5;
+
+/**
+ * Get all transcript segments within a context window around a photo timestamp.
+ *
+ * This solves the problem of split phrases like "two bedside" + "tables converted from stools"
+ * being separated across segments. By including neighboring segments, the vision model
+ * gets complete context even when Whisper splits speech at natural pauses.
+ *
+ * @param photoTimestamp - Session timestamp when photo was taken (seconds)
+ * @param segments - All transcript segments
+ * @returns Array of segments that overlap with the context window
+ */
+export function getContextWindow(
+  photoTimestamp: number,
+  segments: TranscriptSegment[]
+): TranscriptSegment[] {
+  if (!segments || segments.length === 0) {
+    return [];
+  }
+
+  if (photoTimestamp < 0 || !Number.isFinite(photoTimestamp)) {
+    return [];
+  }
+
+  const windowStart = photoTimestamp - CONTEXT_WINDOW_SECONDS;
+  const windowEnd = photoTimestamp + CONTEXT_WINDOW_SECONDS;
+
+  return segments.filter(seg =>
+    // Segment overlaps with window if it ends after window starts AND starts before window ends
+    seg.end >= windowStart && seg.start <= windowEnd
+  );
+}
+
+/**
+ * Build a combined context string from multiple transcript segments.
+ *
+ * @param segments - Transcript segments to combine
+ * @returns Combined text from all segments, space-separated
+ */
+export function buildContextString(segments: TranscriptSegment[]): string {
+  if (!segments || segments.length === 0) {
+    return '';
+  }
+
+  return segments.map(s => s.text.trim()).join(' ');
+}
+
 /**
  * Correlate photos to transcript segments based on session timestamps.
  *

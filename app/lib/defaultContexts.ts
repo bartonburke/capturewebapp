@@ -395,39 +395,48 @@ notable features, and any observations relevant to environmental or engineering 
 
 const homeInventoryVisionPrompt = `You are cataloging items in a home to help find things later.
 
-For each photo, extract:
-1. **room** - Which room is this? (kitchen, bedroom, garage, etc.) Use lowercase.
-2. **area** - Where in the room? (counter, closet, by the window, etc.)
-3. **container** - What holds the items? (drawer, shelf, bin, cabinet, etc.) Null if items aren't in a container.
-4. **items** - List of things visible. Use plain language names.
-5. **notes** - Any verbal context from the transcript worth remembering.
+## ROOM CLASSIFICATION (REQUIRED - pick ONE)
+Choose from: living room, family room, den, bedroom, master bedroom, guest bedroom, kids room, kitchen, dining room, bathroom, office, home office, garage, workshop, laundry room, utility room, basement, attic, hallway, entryway, mudroom, closet (only if walk-in), patio, yard
 
-## ITEM EXTRACTION RULES
-- List each distinct item you can see
-- Use common names: "hammer" not "ball-peen hammer with fiberglass handle"
-- Include color/size only if helpful for finding: "red toolbox", "large plastic bin"
-- Group similar items: "assorted screwdrivers" not individual listings
-- If transcript mentions items, include those too
+DISAMBIGUATION:
+- Closet inside bedroom = "bedroom" (area = "closet")
+- Desk in bedroom = "bedroom" (area = "desk area")
+- Washer/dryer area = "laundry room"
+- NEVER return "room", compound rooms, or ambiguous values like "bedroom or office"
+
+## SYSTEMATIC SCANNING
+List ALL items visible, scanning:
+1. FOREGROUND - closest to camera
+2. MIDDLE - main subjects, furniture
+3. BACKGROUND - wall items, pets, plants, distant objects
+4. FLOOR - items on ground
+5. CONTAINERS - shelves, drawers, bins holding items
+
+## CONTAINER RULES
+- Items IN something (drawer, bin, box) → container = that thing
+- Items ON something (shelf, counter, table) → container = that surface
+- Use null ONLY for loose items on floor or wall-mounted
+- The container itself ALSO goes in items list
+
+## ITEM NAMING
+- Common names: "hammer" not "claw hammer with rubber grip"
+- Color/size only if helpful: "red toolbox", "large bin"
+- Group similar: "assorted screwdrivers"
+- Include ALL visible: pets, plants, art, background items
 
 ## EXAMPLES
 
-Photo of kitchen counter with appliances:
-- room: "kitchen"
-- area: "counter, left of stove"
-- container: null
-- items: ["red stand mixer", "toaster", "knife block"]
+Kitchen counter with appliances:
+- room: "kitchen", area: "counter", container: null
+- items: ["stand mixer", "toaster", "knife block"]
 
-Photo of garage shelving with bins:
-- room: "garage"
-- area: "metal shelving unit, back wall"
-- container: "large clear plastic bin, top shelf"
-- items: ["christmas lights", "ornaments", "tree stand"]
+Garage shelving with bins:
+- room: "garage", area: "back wall", container: "plastic bin"
+- items: ["plastic bin", "christmas lights", "ornaments"]
 
-Photo of bedroom closet:
-- room: "bedroom"
-- area: "closet"
-- container: "top shelf"
-- items: ["winter blankets", "luggage set"]`;
+Bedroom closet:
+- room: "bedroom", area: "closet", container: "top shelf"
+- items: ["shelf", "winter blankets", "luggage"]`;
 
 const travelLogVisionPrompt = `Analyze this travel photo and describe:
 - Location or landmark identification if recognizable

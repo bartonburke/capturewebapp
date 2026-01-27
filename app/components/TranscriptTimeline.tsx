@@ -42,6 +42,11 @@ export default function TranscriptTimeline({
     return photos.filter(photo => {
       const analysis = photoAnalyses.find(pa => pa.photoId === photo.id);
       if (!analysis?.transcriptSegment) return false;
+      // Handle both TranscriptSegment objects and context window strings
+      if (typeof analysis.transcriptSegment === 'string') {
+        // For context window strings, match if segment text is contained
+        return analysis.transcriptSegment.includes(segment.text.trim());
+      }
       return analysis.transcriptSegment.start === segment.start &&
              analysis.transcriptSegment.end === segment.end;
     });

@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
-import { PhotoAnalysis, GpsCoordinates, PhotoEntity, TranscriptSegment, ProjectType, EntitySchemaItem } from '@/app/lib/types';
+import { PhotoAnalysis, GpsCoordinates, PhotoEntity, ProjectType, EntitySchemaItem } from '@/app/lib/types';
 import { getDefaultContext } from '@/app/lib/defaultContexts';
 
-type VisionProvider = 'claude' | 'openai';
-type VisionModel = 'claude-sonnet-4-5-20250929' | 'gpt-4o-mini' | 'gpt-4o';
+type VisionProvider = 'claude' | 'openai' | 'gemini';
+type VisionModel = 'claude-sonnet-4-5-20250929' | 'gpt-4o-mini' | 'gpt-4o' | 'gemini-2.0-flash';
 
 // Build analysis prompt based on project type and context
 // Dynamically adapts to different project types (ESA, EIR/EIS, Borehole, Generic)
@@ -14,7 +14,7 @@ function buildAnalysisPrompt(
   gps: GpsCoordinates | null,
   timestamp: string,
   sessionTimestamp: number,
-  transcriptContext: TranscriptSegment | null
+  transcriptContext: string | null  // Now a combined string from context window
 ): string {
   const context = getDefaultContext(projectType);
   const basePrompt = context.visionAnalysisPrompt;
@@ -27,7 +27,7 @@ function buildAnalysisPrompt(
   // Home inventory uses a simplified, graph-ready output format
   if (projectType === 'home-inventory') {
     const transcriptNote = transcriptContext
-      ? `\n\n## VERBAL CONTEXT\nThe person said: "${transcriptContext.text}"\nIncorporate any mentioned items or location details into your response.`
+      ? `\n\n## TRANSCRIPT CONTEXT\nAround this photo, the person said: "${transcriptContext}"\nPay attention to ALL items mentioned - the speaker may describe things before or after taking the photo. Include mentioned items/locations in your response.`
       : '';
 
     return `${basePrompt}${transcriptNote}
@@ -35,24 +35,15 @@ function buildAnalysisPrompt(
 ${gpsText}
 [Photo timestamp: ${timestamp}]
 
-Respond ONLY with valid JSON in this exact structure:
-{
-  "description": "Brief findable description of what's in this photo",
-  "room": "lowercase room name (kitchen, bedroom, garage, etc.)",
-  "area": "where in the room (counter, closet, back wall, etc.) or null",
-  "container": "what holds the items (drawer, shelf, bin, etc.) or null",
-  "items": [
-    {"name": "item name", "attributes": {"color": "red", "quantity": "3"}}
-  ],
-  "catalogTags": ["room_tag", "category_tag", "descriptor_tag"],
-  "notes": ["any verbal context worth remembering"]
-}
+Output valid JSON only (no markdown code blocks):
+{"description":"brief findable description","room":"lowercase room type","area":"location in room or null","container":"what holds items or null","items":[{"name":"item","attributes":{}}],"catalogTags":["tag1","tag2"],"notes":["context"]}
 
-IMPORTANT:
-- room is REQUIRED, always lowercase
-- items array should list every distinct item visible
-- attributes are optional, only include if helpful for finding
-- notes should capture transcript context, ownership info, or tips for finding`;
+CRITICAL:
+- room is REQUIRED - use ONE specific room type from the list above, always lowercase
+- items: list EVERY visible item including background (pets, plants, art)
+- container: only null if items are loose on floor or wall-mounted
+- attributes: include color/brand/size only if helpful for finding
+- Ensure complete valid JSON with all closing braces and brackets`;
   }
 
   // Build transcript context section
@@ -60,8 +51,11 @@ IMPORTANT:
   if (transcriptContext) {
     transcriptSection = `
 ## CONSULTANT'S VERBAL CONTEXT
-The field consultant said the following while taking this photo:
-"${transcriptContext.text}"
+Around this photo, the field consultant said:
+"${transcriptContext}"
+
+**IMPORTANT**: This is a context window - it includes speech from before and after the photo was taken.
+Pay attention to ALL items mentioned, as the speaker may describe things before or after clicking the shutter.
 
 **IMPORTANT**: Use this verbal context to enhance your analysis:
 
@@ -372,13 +366,51 @@ async function analyzeWithClaude(
   };
 }
 
+// Call Google Gemini 2.0 Flash for vision analysis
+async function analyzeWithGemini(
+  model: 'gemini-2.0-flash',
+  base64Data: string,
+  mediaType: string,
+  promptText: string
+): Promise<{ text: string; inputTokens: number; outputTokens: number }> {
+  const { GoogleGenerativeAI } = await import('@google/generative-ai');
+
+  const apiKey = process.env.GEMINI_API_KEY;
+
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY not configured');
+  }
+
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const genModel = genAI.getGenerativeModel({ model });
+
+  const result = await genModel.generateContent([
+    {
+      inlineData: {
+        mimeType: `image/${mediaType}`,
+        data: base64Data,
+      },
+    },
+    promptText,
+  ]);
+
+  const rawResponse = result.response.text();
+  const usageMetadata = result.response.usageMetadata;
+
+  return {
+    text: rawResponse,
+    inputTokens: usageMetadata?.promptTokenCount || 0,
+    outputTokens: usageMetadata?.candidatesTokenCount || 0
+  };
+}
+
 export async function POST(req: NextRequest) {
   try {
     console.log('[AnalyzePhoto] Request received');
 
     // Parse request body
     const body = await req.json();
-    const { photoId, imageData, gps, timestamp, sessionTimestamp, transcriptSegment, provider = 'openai', model = 'gpt-4o-mini', projectType = 'phase1-esa' } = body;
+    const { photoId, imageData, gps, timestamp, sessionTimestamp, transcriptContext, provider = 'gemini', model = 'gemini-2.0-flash', projectType = 'phase1-esa' } = body;
 
     // Validation
     if (!photoId || typeof photoId !== 'string') {
@@ -418,15 +450,15 @@ export async function POST(req: NextRequest) {
     console.log(`[AnalyzePhoto] Image format: ${mediaType}, size: ${Math.round(base64Data.length / 1024)}KB`);
     console.log(`[AnalyzePhoto] GPS: ${gps ? 'available' : 'not available'}`);
     console.log(`[AnalyzePhoto] Project type: ${projectType}`);
-    console.log(`[AnalyzePhoto] Transcript context: ${transcriptSegment ? `"${transcriptSegment.text.substring(0, 50)}..."` : 'none'}`);
+    console.log(`[AnalyzePhoto] Transcript context: ${transcriptContext ? `"${transcriptContext.substring(0, 80)}..."` : 'none'}`);
 
-    // Build project-type-specific prompt with transcript context
+    // Build project-type-specific prompt with transcript context (now a context window string)
     const promptText = buildAnalysisPrompt(
       projectType as ProjectType,
       gps,
       timestamp,
       sessionTimestamp || 0,
-      transcriptSegment || null
+      transcriptContext || null
     );
 
     // Call the appropriate vision API based on provider
@@ -438,6 +470,11 @@ export async function POST(req: NextRequest) {
 
     if (provider === 'claude') {
       const result = await analyzeWithClaude(base64Data, mediaType, promptText);
+      responseText = result.text;
+      inputTokens = result.inputTokens;
+      outputTokens = result.outputTokens;
+    } else if (provider === 'gemini') {
+      const result = await analyzeWithGemini('gemini-2.0-flash', base64Data, mediaType, promptText);
       responseText = result.text;
       inputTokens = result.inputTokens;
       outputTokens = result.outputTokens;
@@ -469,8 +506,46 @@ export async function POST(req: NextRequest) {
       const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/) ||
                        responseText.match(/```\n([\s\S]*?)\n```/);
 
-      const jsonText = jsonMatch ? jsonMatch[1] : responseText;
-      parsedResponse = JSON.parse(jsonText);
+      let jsonText = jsonMatch ? jsonMatch[1] : responseText;
+
+      // Try to find JSON object or array if response has extra text
+      const objectMatch = jsonText.match(/[\[{][\s\S]*[\]}]/);
+      if (objectMatch) {
+        jsonText = objectMatch[0];
+      }
+
+      const parsed = JSON.parse(jsonText);
+
+      // Gemini sometimes returns arrays - merge them into single result
+      if (Array.isArray(parsed)) {
+        parsedResponse = {
+          description: parsed[0]?.description,
+          catalogTags: parsed[0]?.catalogTags || [],
+          entities: [],
+          room: parsed[0]?.room,
+          area: parsed[0]?.area,
+          container: parsed[0]?.container,
+          items: [],
+        };
+        // Collect all entities/items from all array elements
+        for (const entry of parsed) {
+          if (entry.entities && Array.isArray(entry.entities)) {
+            (parsedResponse.entities as unknown[]).push(...entry.entities);
+          }
+          if (entry.items && Array.isArray(entry.items)) {
+            (parsedResponse.items as unknown[]).push(...entry.items);
+          }
+          if (entry.catalogTags && Array.isArray(entry.catalogTags)) {
+            for (const tag of entry.catalogTags) {
+              if (!(parsedResponse.catalogTags as string[]).includes(tag)) {
+                (parsedResponse.catalogTags as string[]).push(tag);
+              }
+            }
+          }
+        }
+      } else {
+        parsedResponse = parsed;
+      }
     } catch (parseError) {
       console.error(`[AnalyzePhoto] Failed to parse ${provider} response:`, responseText);
       throw new Error(`${provider} returned invalid JSON format`);
@@ -539,7 +614,7 @@ export async function POST(req: NextRequest) {
         entities,
         timestamp,
         gps: gps || null,
-        transcriptSegment: transcriptSegment || null,
+        transcriptSegment: transcriptContext || null,  // Now stores context window string
         // Store the graph-ready fields for later ingestion
         room: parsedResponse.room as string,
         area: (parsedResponse.area as string) || null,
@@ -568,7 +643,7 @@ export async function POST(req: NextRequest) {
         entities: standardResponse.entities,
         timestamp,
         gps: gps || null,
-        transcriptSegment: transcriptSegment || null
+        transcriptSegment: transcriptContext || null  // Now stores context window string
       };
 
       console.log(`[AnalyzePhoto] Success - Generated ${analysis.catalogTags.length} tags and ${analysis.entities.length} entities`);

@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { Project, PhotoMetadata, AudioMetadata, ProcessingResult, Transcript, TranscriptSegment, PhotoAnalysis, ProcessingProgress, SessionSynthesis } from '../../lib/types';
 import { getProject, getProjectPhotos, getProjectAudio, deletePhoto, deleteAudio, updateProject, deleteProject, deleteLaunchSession, saveProcessingResult, updateProcessingResult, getSessionProcessingResult, getProjectProcessingResults, deleteProcessingResult, savePhoto } from '../../lib/db';
 import { downloadBlob, exportPortableEvidencePackage, generatePortableFilename, exportProcessedSession, generateProcessedFilename } from '../../lib/export';
-import { findMatchingSegment } from '../../lib/correlation';
+import { getContextWindow, buildContextString } from '../../lib/correlation';
 import { extractExifData, fileToBase64 } from '../../lib/exif';
 
 export default function ProjectDetailsPage() {
@@ -229,10 +229,12 @@ export default function ProjectDetailsPage() {
           totalItems: photos.length
         });
 
-        // Find matching transcript segment for this photo (if transcript available)
-        const matchedSegment = transcript ? findMatchingSegment(photo.sessionTimestamp, transcript.segments) : null;
+        // Get context window of transcript segments around this photo's timestamp
+        // This solves split phrases like "two bedside" + "tables converted from stools"
+        const contextSegments = transcript ? getContextWindow(photo.sessionTimestamp, transcript.segments) : [];
+        const transcriptContext = buildContextString(contextSegments);
 
-        console.log(`[ProcessSession] Photo ${i + 1}: sessionTimestamp=${photo.sessionTimestamp}, matched segment:`, matchedSegment?.text?.substring(0, 50) || '(no transcript)');
+        console.log(`[ProcessSession] Photo ${i + 1}: sessionTimestamp=${photo.sessionTimestamp}, context window (${contextSegments.length} segments):`, transcriptContext?.substring(0, 80) || '(no transcript)');
 
         try {
           const analyzeResponse = await fetch('/api/analyze-photo', {
@@ -244,10 +246,10 @@ export default function ProjectDetailsPage() {
               gps: photo.gps,
               timestamp: photo.timestamp,
               sessionTimestamp: photo.sessionTimestamp,
-              transcriptSegment: matchedSegment,
+              transcriptContext: transcriptContext || null,  // Now a string (context window)
               projectType: project.projectType,
-              provider: 'openai',
-              model: 'gpt-4o-mini'
+              provider: 'gemini',
+              model: 'gemini-2.0-flash'
             })
           });
 

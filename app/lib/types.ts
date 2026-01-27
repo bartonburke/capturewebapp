@@ -137,7 +137,7 @@ export interface PhotoAnalysis {
   vlmDescription: string;     // Claude Vision description
   catalogTags: string[];      // Searchable keywords for filtering/search
   entities: PhotoEntity[];    // Photo-specific findings
-  transcriptSegment: TranscriptSegment | null;  // Matched transcript segment
+  transcriptSegment: TranscriptSegment | string | null;  // Matched transcript segment or context window string
   timestamp: string;          // When photo was taken (ISO8601)
   gps: GpsCoordinates | null; // GPS at photo time
 
