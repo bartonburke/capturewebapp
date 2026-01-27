@@ -115,15 +115,64 @@ Spatial memory (photos) + conversational extensibility (schemas) + graph defensi
 - **Enhanced Vision Analysis** - 11-instruction transcript-aware photo analysis prompts
 - **Session Length Limit** - 4-hour max with 5-minute warning
 
-### Next Up (Phase 3)
+### Phase 3 Complete (2026-01-26)
 
-- Timestamp correlation (photos ↔ transcript segments)
-- Entity extraction refinement
+- **Context Window Correlation** - Photos matched to ±5s transcript window (not single segment)
+  - Solves Whisper segment splitting: "two bedside" + "tables converted from stools" now captured together
+  - `getContextWindow()` and `buildContextString()` in `app/lib/correlation.ts`
+- **Optimized Vision Prompts** - Systematic scanning instructions for complete item capture
+  - Enumerated room list with disambiguation rules
+  - Container rules: never null if items are in/on something
+  - Instructions to capture ALL items including background objects
+- **Evaluation Framework** - `tests/evaluation/` with synonym matching for accuracy scoring
+
+### Next Up (Phase 4)
+
+- Entity extraction refinement across photos
+- Cross-session entity deduplication
 
 ### Planned
 
 - Share/download individual photos
 - On-device computer vision demo
+
+### Future: Indoor Position Tracking (Investigated 2026-01-26)
+
+**Goal:** Track relative position indoors where GPS is unavailable, using camera + motion sensors.
+
+**What works on iOS Safari:**
+- ✅ DeviceMotionEvent (accelerometer, gyroscope) — tested working
+- ✅ DeviceOrientationEvent (compass heading) — tested working
+- ✅ Step detection from accelerometer peaks — tested working
+- ✅ WebGPU API exists on iOS 26 beta
+
+**What doesn't work (yet):**
+- ❌ Transformers.js/ONNX Runtime ML inference — crashes Safari (both WebGPU and WASM backends)
+- ❌ WebGPU-accelerated ML — iOS 26 beta implementation unstable
+
+**Recommended approach:**
+1. **IMU-based tracking (ready now):** Compass heading + step detection for relative positioning
+2. **Scene change detection (no ML):** Histogram comparison to detect room transitions
+3. **ML door detection (wait):** Revisit when iOS WebGPU stabilizes or try TensorFlow.js WebGL
+
+**Test pages created:**
+- `/test/motion-sensors` — validates compass, accelerometer, step counter
+- `/test/webgpu-vision` — ML inference test (currently crashes iOS Safari)
+
+**Data model sketch:**
+```typescript
+interface IndoorPosition {
+  heading: number;           // compass degrees
+  stepsSinceOrigin: number;
+  timestamp: number;
+}
+
+interface SpatialAnchor {
+  type: 'door' | 'scene_change' | 'manual';
+  position: IndoorPosition;
+  confidence?: number;
+}
+```
 
 ---
 
@@ -150,9 +199,11 @@ Location: `app/components/CaptureInterface.tsx:73-104`
 #### AI Processing Architecture
 Multi-phase processing pipeline with separate API routes:
 - Phase 1: Whisper transcription via `/api/transcribe-audio`
-- Phase 2: Claude Vision analysis via `/api/analyze-photo`
-- Phase 3: Timestamp correlation (client-side)
+- Phase 2: Vision analysis via `/api/analyze-photo` (Gemini 2.0 Flash)
+- Phase 3: Context window correlation (client-side, ±5s window)
 - Phase 4: Entity extraction via `/api/extract-entities`
+
+**Context Window Approach:** Instead of matching photos to single transcript segments, we collect all segments within ±5 seconds of the photo timestamp. This prevents split phrases from losing context (e.g., "two bedside" in segment 2, "tables converted from stools" in segment 3 - both now sent to vision model).
 
 ProcessingResult objects stored in IndexedDB v4 with sessionId indexing.
 
@@ -381,4 +432,4 @@ done
 
 ---
 
-**Last Updated**: 2026-01-25
+**Last Updated**: 2026-01-26
