@@ -7,6 +7,7 @@ import { getProject, getProjectPhotos, getProjectAudio, deletePhoto, deleteAudio
 import { downloadBlob, exportPortableEvidencePackage, generatePortableFilename, exportProcessedSession, generateProcessedFilename } from '../../lib/export';
 import { getContextWindow, buildContextString } from '../../lib/correlation';
 import { extractExifData, fileToBase64 } from '../../lib/exif';
+import { debug } from '../../lib/debug';
 
 export default function ProjectDetailsPage() {
   const params = useParams();
@@ -91,9 +92,9 @@ export default function ProjectDetailsPage() {
     const checkExistingResults = async () => {
       if (audio.length > 0) {
         const sessionId = audio[0].sessionId;
-        console.log('[ProjectPage] Checking for existing results, sessionId:', sessionId);
+        debug('ProjectPage', 'Checking for existing results, sessionId:', sessionId);
         const existingResult = await getSessionProcessingResult(sessionId);
-        console.log('[ProjectPage] Loaded result:', existingResult ? {
+        debug('ProjectPage', 'Loaded result:', existingResult ? {
           id: existingResult.id,
           status: existingResult.status,
           hasSynthesis: !!existingResult.synthesis,
@@ -132,7 +133,7 @@ export default function ProjectDetailsPage() {
       const fileSizeMB = audioItem.fileSize / (1024 * 1024);
       // If audio is >25MB, it's likely a pre-fix capture with video frames
       if (fileSizeMB > 25) {
-        console.log(`[ProcessSession] Audio too large (${fileSizeMB.toFixed(2)}MB), showing dialog`);
+        debug('ProcessSession', `Audio too large (${fileSizeMB.toFixed(2)}MB), showing dialog`);
         setShowAudioTooLargeDialog(true);
         return;
       }
@@ -151,7 +152,7 @@ export default function ProjectDetailsPage() {
       // Step 1: Handle audio (skip if requested or no audio)
       if (!skipAudio && audioItem) {
         const fileSizeMB = audioItem.fileSize / (1024 * 1024);
-        console.log(`[ProcessSession] Audio size: ${fileSizeMB.toFixed(2)}MB`);
+        debug('ProcessSession', `Audio size: ${fileSizeMB.toFixed(2)}MB`);
         setProcessingProgress({ step: 'transcribing', progress: 0, message: 'Starting transcription...' });
 
         let audioUrl: string | undefined;
@@ -159,7 +160,7 @@ export default function ProjectDetailsPage() {
 
         if (fileSizeMB > 4) {
           // Large file - upload to Vercel Blob first
-          console.log('[ProcessSession] Large file detected, uploading to blob storage...');
+          debug('ProcessSession', 'Large file detected, uploading to blob storage...');
           setProcessingProgress({ step: 'uploading', progress: 5, message: 'Uploading audio...' });
 
           try {
@@ -177,7 +178,7 @@ export default function ProjectDetailsPage() {
             );
 
             audioUrl = result.url;
-            console.log('[ProcessSession] Audio uploaded to:', audioUrl);
+            debug('ProcessSession', 'Audio uploaded to:', audioUrl);
           } catch (uploadError: any) {
             console.error('[ProcessSession] Blob upload failed:', uploadError);
             throw new Error(`Failed to upload large audio file: ${uploadError.message}`);
@@ -188,7 +189,7 @@ export default function ProjectDetailsPage() {
         }
 
         // Transcribe audio
-        console.log('[ProcessSession] Starting transcription...');
+        debug('ProcessSession', 'Starting transcription...');
         setProcessingProgress({ step: 'transcribing', progress: 10, message: 'Transcribing audio...' });
 
         const transcribeResponse = await fetch('/api/transcribe-audio', {
@@ -208,9 +209,9 @@ export default function ProjectDetailsPage() {
 
         const transcriptData = await transcribeResponse.json();
         transcript = transcriptData.transcript;
-        console.log('[ProcessSession] Transcription complete:', transcript!.fullText.substring(0, 100) + '...');
+        debug('ProcessSession', 'Transcription complete:', transcript!.fullText.substring(0, 100) + '...');
       } else {
-        console.log('[ProcessSession] Skipping audio transcription');
+        debug('ProcessSession', 'Skipping audio transcription');
         setProcessingProgress({ step: 'analyzing_photos', progress: 10, message: 'Skipping audio (photos only)...' });
       }
 
@@ -234,7 +235,7 @@ export default function ProjectDetailsPage() {
         const contextSegments = transcript ? getContextWindow(photo.sessionTimestamp, transcript.segments) : [];
         const transcriptContext = buildContextString(contextSegments);
 
-        console.log(`[ProcessSession] Photo ${i + 1}: sessionTimestamp=${photo.sessionTimestamp}, context window (${contextSegments.length} segments):`, transcriptContext?.substring(0, 80) || '(no transcript)');
+        debug('ProcessSession', `Photo ${i + 1}: sessionTimestamp=${photo.sessionTimestamp}, context window (${contextSegments.length} segments):`, transcriptContext?.substring(0, 80) || '(no transcript)');
 
         try {
           const analyzeResponse = await fetch('/api/analyze-photo', {
@@ -265,7 +266,7 @@ export default function ProjectDetailsPage() {
         }
       }
 
-      console.log(`[ProcessSession] Analyzed ${photoAnalyses.length} of ${photos.length} photos`);
+      debug('ProcessSession', `Analyzed ${photoAnalyses.length} of ${photos.length} photos`);
 
       // Step 3: Save processing result
       setProcessingProgress({ step: 'saving', progress: 95, message: 'Saving results...' });
@@ -282,7 +283,7 @@ export default function ProjectDetailsPage() {
       const existingResults = await getProjectProcessingResults(project.id);
       const oldSessionResults = existingResults.filter(r => r.sessionId === sessionId);
       if (oldSessionResults.length > 0) {
-        console.log(`[ProcessSession] Deleting ${oldSessionResults.length} old processing results for session ${sessionId}`);
+        debug('ProcessSession', `Deleting ${oldSessionResults.length} old processing results for session ${sessionId}`);
         for (const old of oldSessionResults) {
           await deleteProcessingResult(old.id);
         }
@@ -304,7 +305,7 @@ export default function ProjectDetailsPage() {
 
       // Step 4: Sync to Neo4j graph
       setProcessingProgress({ step: 'syncing', progress: 97, message: 'Syncing to knowledge graph...' });
-      console.log('[ProcessSession] Syncing to Neo4j...');
+      debug('ProcessSession', 'Syncing to Neo4j...');
 
       try {
         // Build Portable Evidence Package format for ingest
@@ -358,7 +359,7 @@ export default function ProjectDetailsPage() {
 
         const ingestResult = await ingestResponse.json();
         if (ingestResult.success) {
-          console.log(`[ProcessSession] Neo4j sync complete: ${ingestResult.nodesCreated.photos} photos, ${ingestResult.nodesCreated.entities} entities`);
+          debug('ProcessSession', `Neo4j sync complete: ${ingestResult.nodesCreated.photos} photos, ${ingestResult.nodesCreated.entities} entities`);
         } else {
           console.warn('[ProcessSession] Neo4j sync failed:', ingestResult.errors);
           // Don't fail the whole process - sync is non-critical
@@ -371,7 +372,7 @@ export default function ProjectDetailsPage() {
       // Step 5: Session Synthesis (for home-inventory and other supported types)
       if (project.projectType === 'home-inventory') {
         setProcessingProgress({ step: 'synthesizing', progress: 98, message: 'Synthesizing inventory...' });
-        console.log('[ProcessSession] Starting synthesis...');
+        debug('ProcessSession', 'Starting synthesis...');
 
         try {
           const synthesizeResponse = await fetch('/api/synthesize-session', {
@@ -389,16 +390,16 @@ export default function ProjectDetailsPage() {
           if (synthesizeResponse.ok) {
             const synthesizeResult = await synthesizeResponse.json();
             if (synthesizeResult.success && synthesizeResult.synthesis) {
-              console.log(`[ProcessSession] Synthesis complete: ${synthesizeResult.synthesis.deliverables.length} deliverables`);
+              debug('ProcessSession', `Synthesis complete: ${synthesizeResult.synthesis.deliverables.length} deliverables`);
 
               // Update result with synthesis (use updateProcessingResult since record already exists)
               result.synthesis = synthesizeResult.synthesis;
               await updateProcessingResult(result);
               setProcessingResult(result);
-              console.log('[ProcessSession] Synthesis saved successfully');
+              debug('ProcessSession', 'Synthesis saved successfully');
 
               // Step 5b: Sync inventory items to Neo4j graph
-              console.log('[ProcessSession] Syncing inventory to graph...');
+              debug('ProcessSession', 'Syncing inventory to graph...');
               try {
                 const inventorySyncResponse = await fetch('/api/graph/sync-inventory', {
                   method: 'POST',
@@ -410,7 +411,7 @@ export default function ProjectDetailsPage() {
                 });
                 if (inventorySyncResponse.ok) {
                   const inventorySyncResult = await inventorySyncResponse.json();
-                  console.log(`[ProcessSession] Inventory synced: ${inventorySyncResult.nodesCreated.items} items, ${inventorySyncResult.nodesCreated.locations} locations`);
+                  debug('ProcessSession', `Inventory synced: ${inventorySyncResult.nodesCreated.items} items, ${inventorySyncResult.nodesCreated.locations} locations`);
                 } else {
                   console.warn('[ProcessSession] Inventory sync failed:', await inventorySyncResponse.text());
                 }
@@ -429,7 +430,7 @@ export default function ProjectDetailsPage() {
       }
 
       setProcessingProgress({ step: 'synthesizing', progress: 100, message: 'Processing complete!' });
-      console.log('[ProcessSession] Complete!');
+      debug('ProcessSession', 'Complete!');
 
     } catch (error: any) {
       console.error('[ProcessSession] Error:', error);
@@ -527,7 +528,7 @@ export default function ProjectDetailsPage() {
       await updateProject(updatedProject);
       setProject(updatedProject);
 
-      console.log(`[Upload] Successfully uploaded ${newPhotos.length} photos`);
+      debug('Upload', `Successfully uploaded ${newPhotos.length} photos`);
     } catch (error) {
       console.error('Failed to upload photos:', error);
       alert('Failed to upload some photos. Please try again.');
@@ -552,7 +553,7 @@ export default function ProjectDetailsPage() {
         try {
           await deleteLaunchSession(project.launchSessionId);
         } catch (e) {
-          console.log('No launch session to delete or already deleted');
+          debug('ProjectPage', 'No launch session to delete or already deleted');
         }
       }
 
@@ -580,7 +581,7 @@ export default function ProjectDetailsPage() {
         formData.append('file', zipBlob, filename);
         formData.append('sessionId', sessionId);
 
-        console.log('[Export] Auto-uploading to import API...');
+        debug('Export', 'Auto-uploading to import API...');
         const importResponse = await fetch('/api/v1/capture/import', {
           method: 'POST',
           body: formData,
@@ -588,7 +589,7 @@ export default function ProjectDetailsPage() {
 
         if (importResponse.ok) {
           const importResult = await importResponse.json();
-          console.log('[Export] Auto-imported to:', importResult.outputPath);
+          debug('Export', 'Auto-imported to:', importResult.outputPath);
         } else {
           const errorData = await importResponse.json();
           console.warn('[Export] Auto-import failed:', errorData.error);
@@ -625,7 +626,7 @@ export default function ProjectDetailsPage() {
           await deleteLaunchSession(project.launchSessionId);
         } catch (e) {
           // Ignore if launch session doesn't exist
-          console.log('No launch session to delete');
+          debug('ProjectPage', 'No launch session to delete');
         }
       }
 

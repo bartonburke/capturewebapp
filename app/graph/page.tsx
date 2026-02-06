@@ -34,13 +34,13 @@ interface SearchResponse {
   error?: string;
 }
 
-const ESA_QUERIES = [
+const DEFAULT_QUERIES = [
   'all photos',
-  'photos with AOCs',
-  'photos showing staining or water damage',
-  'environmental concerns',
-  'photos with medium or high REC potential',
-  'photos showing pipes or drains',
+  'photos from today',
+  'photos near this location',
+  'high severity findings',
+  'photos with entities',
+  'most recent session',
 ];
 
 const INVENTORY_QUERIES = [
@@ -57,7 +57,7 @@ function GraphSearchContent() {
   const sessionId = searchParams.get('sessionId');
   const projectType = searchParams.get('projectType');
 
-  const exampleQueries = projectType === 'home-inventory' ? INVENTORY_QUERIES : ESA_QUERIES;
+  const exampleQueries = projectType === 'home-inventory' ? INVENTORY_QUERIES : DEFAULT_QUERIES;
 
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);

@@ -41,6 +41,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (!process.env.ANTHROPIC_API_KEY && !process.env.CLAUDE_API_KEY) {
+      return NextResponse.json(
+        { error: 'Search unavailable: ANTHROPIC_API_KEY not configured. Set it in your environment variables.' },
+        { status: 503 }
+      );
+    }
+
     const anthropic = new Anthropic();
 
     // Build project context for Claude

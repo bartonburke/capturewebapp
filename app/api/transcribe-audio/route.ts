@@ -34,6 +34,13 @@ interface TranscribeResponse {
 
 export async function POST(req: NextRequest) {
   try {
+    if (!process.env.OPENAI_API_KEY) {
+      return NextResponse.json(
+        { error: 'Transcription unavailable: OPENAI_API_KEY not configured. Set it in your environment variables.' },
+        { status: 503 }
+      );
+    }
+
     // Parse request
     const body: TranscribeRequest = await req.json();
     const { audioData, audioUrl, mimeType } = body;
