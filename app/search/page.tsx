@@ -178,7 +178,7 @@ export default function SearchPage() {
         {/* Example queries */}
         <div className="mt-3 flex flex-wrap gap-2">
           <span className="text-gray-500 text-sm">Try:</span>
-          {['unprocessed', 'last week', 'Phase I ESA', 'with photos'].map((example) => (
+          {['unprocessed', 'last week', 'home inventory', 'with photos'].map((example) => (
             <button
               key={example}
               onClick={() => {
