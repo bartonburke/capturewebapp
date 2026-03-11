@@ -104,6 +104,19 @@ export async function POST(req: NextRequest): Promise<NextResponse<SearchRespons
       );
     }
 
+    if (!process.env.OPENAI_API_KEY) {
+      return NextResponse.json(
+        {
+          success: false,
+          results: [],
+          cypherQuery: '',
+          executionTimeMs: 0,
+          error: 'Graph search unavailable: OPENAI_API_KEY not configured.',
+        },
+        { status: 503 }
+      );
+    }
+
     console.log(`[GraphSearch] Query: "${query}"${sessionId ? ` (sessionId: ${sessionId})` : ''}${projectType ? ` (type: ${projectType})` : ''}`);
 
     // Look up search schema for this project type

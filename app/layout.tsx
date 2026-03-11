@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ChoraGraph Capture - ESA Site Assessment",
-  description: "Mobile-first PWA for capturing Phase 1 ESA site assessment data",
+  title: "ChoraGraph Capture",
+  description: "Mobile-first PWA for spatial field capture and evidence collection",
   viewport: {
     width: 'device-width',
     initialScale: 1,
@@ -27,7 +27,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'ESA Capture'
+    title: 'ChoraGraph'
   }
 };
 

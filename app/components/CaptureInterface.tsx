@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Project, SessionState, GpsStatus, GpsCoordinates, PhotoMetadata, AudioMetadata, ProjectContext, CompassStatus, CompassData } from '../lib/types';
 import { savePhoto, updateProject, saveAudio, getProject, getProjectPhotos } from '../lib/db';
+import { debug } from '../lib/debug';
 import { getTypeConfig } from '../lib/projectTypeConfig';
 import ThumbnailPicker from './ThumbnailPicker';
 
@@ -60,9 +61,9 @@ export default function CaptureInterface({ project, context }: Props) {
 
   // Initialize camera once when starting recording
   useEffect(() => {
-    console.log('Camera effect triggered - sessionState:', sessionState, 'stream:', stream ? 'exists' : 'null');
+    debug('Capture', 'Camera effect triggered - sessionState:', sessionState, 'stream:', stream ? 'exists' : 'null');
     if (sessionState === 'RECORDING' && !stream) {
-      console.log('Conditions met, calling initializeCamera()');
+      debug('Capture', 'Conditions met, calling initializeCamera()');
       initializeCamera();
     }
 
@@ -133,13 +134,13 @@ export default function CaptureInterface({ project, context }: Props) {
 
     // Auto-end at limit
     if (duration >= MAX_SESSION_DURATION_SECONDS) {
-      console.log('[Session] Maximum duration reached, auto-ending session');
+      debug('Session', 'Maximum duration reached, auto-ending session');
       handleEndSession();
     }
   }, [duration, sessionState]);
 
   const initializeCamera = async () => {
-    console.log('Initializing camera...');
+    debug('Capture', 'Initializing camera...');
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: {
@@ -154,7 +155,7 @@ export default function CaptureInterface({ project, context }: Props) {
         }
       });
 
-      console.log('Media stream obtained:',
+      debug('Capture', 'Media stream obtained:',
         mediaStream.getVideoTracks().length, 'video tracks,',
         mediaStream.getAudioTracks().length, 'audio tracks'
       );
@@ -172,7 +173,7 @@ export default function CaptureInterface({ project, context }: Props) {
       }
 
       setError(null);
-      console.log('Camera initialized successfully');
+      debug('Capture', 'Camera initialized successfully');
     } catch (err) {
       const error = err as Error;
 
@@ -200,7 +201,7 @@ export default function CaptureInterface({ project, context }: Props) {
         return;
       }
 
-      console.log('Initializing audio recorder...');
+      debug('Capture', 'Initializing audio recorder...');
 
       // Create audio-only stream to avoid recording video frames
       // This dramatically reduces file size (from ~75MB to ~100KB for short recordings)
@@ -219,13 +220,13 @@ export default function CaptureInterface({ project, context }: Props) {
       recorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           audioChunksRef.current.push(event.data);
-          console.log('Audio chunk received:', event.data.size, 'bytes');
+          debug('Capture', 'Audio chunk received:', event.data.size, 'bytes');
         }
       };
 
       // Handle recording stop
       recorder.onstop = async () => {
-        console.log('Audio recording stopped, processing...');
+        debug('Capture', 'Audio recording stopped, processing...');
         await saveAudioRecording();
       };
 
@@ -236,12 +237,12 @@ export default function CaptureInterface({ project, context }: Props) {
 
       setAudioRecorder(recorder);
       setAudioError(null);
-      console.log('Audio recorder initialized with mimeType:', mimeType);
+      debug('Capture', 'Audio recorder initialized with mimeType:', mimeType);
 
       // Start recording immediately if session is active
       // This prevents race conditions with useEffect timing
       if (recorder.state === 'inactive') {
-        console.log('Starting audio recording immediately after initialization');
+        debug('Capture', 'Starting audio recording immediately after initialization');
         recorder.start(1000); // Collect data every 1 second
       }
 
@@ -403,30 +404,30 @@ export default function CaptureInterface({ project, context }: Props) {
 
   // Audio recorder lifecycle - start/pause/resume/stop based on sessionState
   useEffect(() => {
-    console.log('Audio effect triggered - sessionState:', sessionState, 'recorder:', audioRecorder ? `state=${audioRecorder.state}` : 'null');
+    debug('Capture', 'Audio effect triggered - sessionState:', sessionState, 'recorder:', audioRecorder ? `state=${audioRecorder.state}` : 'null');
 
     if (!audioRecorder) return;
 
     if (sessionState === 'RECORDING' && audioRecorder.state === 'inactive') {
-      console.log('Starting audio recording (fallback)');
+      debug('Capture', 'Starting audio recording (fallback)');
       audioRecorder.start(1000); // Collect data every 1 second
     } else if (sessionState === 'RECORDING' && audioRecorder.state === 'recording') {
-      console.log('Audio already recording - no action needed');
+      debug('Capture', 'Audio already recording - no action needed');
     } else if (sessionState === 'PAUSED' && audioRecorder.state === 'recording') {
-      console.log('Pausing audio recording');
+      debug('Capture', 'Pausing audio recording');
       audioRecorder.pause();
     } else if (sessionState === 'RECORDING' && audioRecorder.state === 'paused') {
-      console.log('Resuming audio recording');
+      debug('Capture', 'Resuming audio recording');
       audioRecorder.resume();
     } else if (sessionState === 'ENDED' && audioRecorder.state !== 'inactive') {
-      console.log('Stopping audio recording');
+      debug('Capture', 'Stopping audio recording');
       audioRecorder.stop();
     }
 
   }, [sessionState, audioRecorder]);
 
   const handleStartSession = () => {
-    console.log('Starting session for project:', project.name);
+    debug('Capture', 'Starting session for project:', project.name);
 
     // Generate new session ID for this capture session
     sessionIdRef.current = crypto.randomUUID();
@@ -501,7 +502,7 @@ export default function CaptureInterface({ project, context }: Props) {
             setPhotoCount(prev => prev + 1);
 
             // Debug log
-            console.log('Photo captured:', {
+            debug('Capture', 'Photo captured:', {
               id: photoMetadata.id,
               projectName: project.name,
               gps: currentGps
@@ -553,14 +554,14 @@ export default function CaptureInterface({ project, context }: Props) {
         return;
       }
 
-      console.log('Saving audio recording:', audioChunksRef.current.length, 'chunks');
+      debug('Capture', 'Saving audio recording:', audioChunksRef.current.length, 'chunks');
 
       // Combine all audio chunks into single blob
       const audioBlob = new Blob(audioChunksRef.current, {
         type: audioRecorder?.mimeType || 'audio/webm'
       });
 
-      console.log('Audio blob created:', audioBlob.size, 'bytes');
+      debug('Capture', 'Audio blob created:', audioBlob.size, 'bytes');
 
       // Convert to base64
       const reader = new FileReader();
@@ -595,7 +596,7 @@ export default function CaptureInterface({ project, context }: Props) {
           await updateProject(updatedProject);
         }
 
-        console.log('Audio saved successfully:', {
+        debug('Capture', 'Audio saved successfully:', {
           id: audioMetadata.id,
           sessionId: audioMetadata.sessionId,
           duration: audioMetadata.duration,
@@ -664,7 +665,7 @@ export default function CaptureInterface({ project, context }: Props) {
           modifiedAt: new Date().toISOString(),
         };
         await updateProject(updatedProject);
-        console.log('Thumbnail saved for project:', project.id);
+        debug('Capture', 'Thumbnail saved for project:', project.id);
       }
     } catch (error) {
       console.error('Failed to save thumbnail:', error);

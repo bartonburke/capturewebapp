@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Project } from '../lib/types';
 import { getAllProjects, deleteProject, getProjectPhotos, updateProject } from '../lib/db';
+import { debug } from '../lib/debug';
 import CreateProjectModal from './CreateProjectModal';
 import ProjectCard from './ProjectCard';
 import EmptyState from './EmptyState';
@@ -19,9 +20,9 @@ export default function ProjectsList() {
 
   const loadProjects = useCallback(async () => {
     try {
-      console.log('[ProjectsList] Loading projects...');
+      debug('ProjectsList', 'Loading projects...');
       const allProjects = await getAllProjects();
-      console.log('[ProjectsList] Loaded', allProjects.length, 'projects');
+      debug('ProjectsList', 'Loaded', allProjects.length, 'projects');
       setProjects(allProjects);
     } catch (error) {
       console.error('[ProjectsList] Failed to load projects:', error);
@@ -39,13 +40,13 @@ export default function ProjectsList() {
     // Also reload when page becomes visible
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        console.log('Page visible, reloading projects');
+        debug('ProjectsList', 'Page visible, reloading projects');
         loadProjects();
       }
     };
 
     const handleFocus = () => {
-      console.log('Window focused, reloading projects');
+      debug('ProjectsList', 'Window focused, reloading projects');
       loadProjects();
     };
 
@@ -97,7 +98,7 @@ export default function ProjectsList() {
 
             // Update local state
             setProjects(prev => prev.map(p => p.id === project.id ? updatedProject : p));
-            console.log('[ProjectsList] Generated thumbnail for project:', project.name);
+            debug('ProjectsList', 'Generated thumbnail for project:', project.name);
           }
         } catch (error) {
           console.error('[ProjectsList] Failed to generate thumbnail for project:', project.id, error);
@@ -172,7 +173,7 @@ export default function ProjectsList() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold mb-1">ChoraGraph Capture</h1>
-            <p className="text-gray-400 text-sm">Environmental Field Evidence</p>
+            <p className="text-gray-400 text-sm">Spatial Field Capture</p>
           </div>
           <Link
             href="/graph"
@@ -208,7 +209,7 @@ export default function ProjectsList() {
       <div className="fixed bottom-6 left-0 right-0 flex justify-center z-40 px-4">
         <button
           onClick={() => {
-            console.log('[ProjectsList] New Project button clicked');
+            debug('ProjectsList', 'New Project button clicked');
             setShowCreateModal(true);
           }}
           className="group relative px-8 py-4 rounded-full font-semibold transition-all duration-300 ease-out active:scale-95 hover:scale-105"
